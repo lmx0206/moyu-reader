@@ -61,10 +61,10 @@ func (logTheme) LinePrefix(seed int) string {
 }
 
 func (logTheme) Header(width int, status string) string {
-	return fitLine("app.log — tail -f   "+status, width)
+	return padBetween("app.log · tail -f", "● running", width)
 }
 func (logTheme) Footer(width int, status string) string {
-	return fitLine("INFO  watching for changes   "+status, width)
+	return padBetween("INFO  142 passed · "+status, "? help", width)
 }
 func (logTheme) BossLine(seed int) string {
 	return fitLine(logTheme{}.LinePrefix(seed)+bossPayload[seed%len(bossPayload)], 0)
@@ -83,10 +83,10 @@ func (buildTheme) LinePrefix(seed int) string {
 	return fmt.Sprintf("> %s %s … ", buildVerbs[seed%len(buildVerbs)], buildMods[(seed/3)%len(buildMods)])
 }
 func (buildTheme) Header(width int, status string) string {
-	return fitLine("> gradle build   "+status, width)
+	return padBetween("> gradle build", "building…", width)
 }
 func (buildTheme) Footer(width int, status string) string {
-	return fitLine("BUILD SUCCESSFUL in 12s   "+status, width)
+	return padBetween("BUILD SUCCESSFUL in 12s · "+status, "? help", width)
 }
 func (buildTheme) BossLine(seed int) string {
 	return fitLine(buildTheme{}.LinePrefix(seed)+bossPayload[seed%len(bossPayload)], 0)
@@ -105,10 +105,10 @@ func (gitTheme) LinePrefix(seed int) string {
 	return "  // "
 }
 func (gitTheme) Header(width int, status string) string {
-	return fitLine("git diff --stat   "+status, width)
+	return padBetween("git log -p", "● HEAD", width)
 }
 func (gitTheme) Footer(width int, status string) string {
-	return fitLine("3 files changed, 128 insertions(+)   "+status, width)
+	return padBetween("3 files changed · "+status, "? help", width)
 }
 func (gitTheme) BossLine(seed int) string {
 	return fitLine(fmt.Sprintf("commit %08x  %s", seed*2654435761, bossPayload[seed%len(bossPayload)]), 0)
