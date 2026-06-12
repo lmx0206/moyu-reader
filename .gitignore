@@ -1,6 +1,9 @@
 # Runtime data (bookshelf + imported epubs + progress)
 /data/
 
+# Local real-book test fixtures (copyrighted; keep on disk, never commit)
+/docs/book/
+
 # Built binaries
 /reader
 /reader.exe
