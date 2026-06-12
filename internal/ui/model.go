@@ -18,6 +18,8 @@ const (
 	screenShelf screen = iota
 	screenReader
 	screenImport
+	screenTOC
+	screenHelp
 )
 
 // bossTickMsg drives the boss-screen auto-scroll.
@@ -37,7 +39,11 @@ type Model struct {
 
 	shelf  *ShelfView
 	reader *ReaderView
+	book   *epub.Book
 	bookID string
+
+	toc        *TOCView
+	helpReturn screen
 
 	bossActive bool
 	bossTick   int
@@ -80,6 +86,7 @@ func (m *Model) openBook(id string) {
 		return
 	}
 	m.reader = NewReaderView(book, e.Progress, e.Prefs, m.width, m.height)
+	m.book = book
 	m.bookID = id
 	m.screen = screenReader
 }
@@ -124,8 +131,21 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	key := msg.String()
 
-	if m.screen == screenImport {
+	switch m.screen {
+	case screenImport:
 		return m.handleImportKey(msg)
+	case screenHelp:
+		m.screen = m.helpReturn // any key closes help
+		return m, nil
+	case screenTOC:
+		return m.handleTOCKey(key)
+	}
+
+	// Help is available from shelf and reader.
+	if key == "?" {
+		m.helpReturn = m.screen
+		m.screen = screenHelp
+		return m, nil
 	}
 
 	// Global: backtick / b activates boss screen (only meaningful while reading).
@@ -140,6 +160,22 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleShelfKey(key)
 	case screenReader:
 		return m.handleReaderKey(key)
+	}
+	return m, nil
+}
+
+func (m *Model) handleTOCKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "up", "k":
+		m.toc.MoveUp()
+	case "down", "j":
+		m.toc.MoveDown()
+	case "enter":
+		m.reader.JumpTo(m.toc.Selected())
+		m.saveProgress()
+		m.screen = screenReader
+	case "esc", "q":
+		m.screen = screenReader
 	}
 	return m, nil
 }
@@ -206,6 +242,11 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 		m.reader.CycleStyle()
 	case "m":
 		m.reader.ToggleMode()
+	case "g":
+		if m.book != nil {
+			m.toc = NewTOCView(m.book, m.reader.Progress().Chapter)
+			m.screen = screenTOC
+		}
 	}
 	return m, nil
 }
@@ -261,6 +302,10 @@ func (m *Model) View() string {
 			return strings.Join(paintShell(lines), "\n")
 		}
 		return strings.Join(paintDim(lines), "\n")
+	case screenTOC:
+		return strings.Join(paintDim(m.toc.Render(m.width, m.height)), "\n")
+	case screenHelp:
+		return strings.Join(paintDim(helpText()), "\n")
 	case screenImport:
 		return "导入 EPUB（粘贴 .epub 完整路径后回车，Esc 取消）:\n\n> " + m.importBuf + "\n\n" + m.status
 	default:
@@ -277,4 +322,28 @@ func (m *Model) readerStyle() string {
 		return m.reader.Prefs().Style
 	}
 	return m.lib.Global.Style
+}
+
+// helpText returns the keybinding help, disguised as a CLI --help dump.
+func helpText() []string {
+	return []string{
+		"reader - a tail-style log viewer (v0.2)",
+		"",
+		"USAGE:",
+		"  reader [command]",
+		"",
+		"KEYBINDINGS (shelf):",
+		"  up/down  select    enter  open    i  import    d  delete    q  quit",
+		"",
+		"KEYBINDINGS (reader):",
+		"  space/→/pgdn  next page      up/down  scroll line",
+		"  tab  switch profile          m        toggle view",
+		"  g    goto section            `/b      minimize",
+		"  ?    help                    esc      back to list",
+		"",
+		"KEYBINDINGS (stream/CLI):",
+		"  enter  next    b  back    t  switch profile    q  quit",
+		"",
+		"(press any key to dismiss)",
+	}
 }
