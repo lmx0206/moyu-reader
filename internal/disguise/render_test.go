@@ -20,21 +20,33 @@ func TestRenderInlinePrefixesEachLine(t *testing.T) {
 	}
 }
 
-func TestRenderShellWrapsBodyWithChrome(t *testing.T) {
+func TestRenderShellFiveSectionLayout(t *testing.T) {
 	th := ThemeByName("build")
 	body := []string{"正文一", "正文二"}
-	out := RenderShell(th, body, 40, "ch.1/10")
-	if len(out) < 4 {
-		t.Fatalf("shell output too short: %v", out)
+	out := RenderShell(th, body, 40, "ch.1/10 · 0%")
+	// 4 装饰行(顶栏/分隔/分隔/底栏) + 2 正文 = 6
+	if len(out) != 6 {
+		t.Fatalf("want 6 lines, got %d: %#v", len(out), out)
 	}
 	if !strings.Contains(out[0], "gradle") {
-		t.Fatalf("first line should be build header: %q", out[0])
+		t.Fatalf("top bar should be build theme: %q", out[0])
 	}
-	if out[1] != "正文一" || out[2] != "正文二" {
-		t.Fatalf("body not preserved verbatim: %#v", out)
+	if !strings.Contains(out[1], "─") {
+		t.Fatalf("line1 should be separator: %q", out[1])
 	}
-	last := out[len(out)-1]
-	if !strings.Contains(last, "SUCCESSFUL") {
-		t.Fatalf("last line should be build footer: %q", last)
+	if !strings.Contains(out[2], "正文一") {
+		t.Fatalf("body line should be present (indented): %q", out[2])
+	}
+	if !strings.HasPrefix(out[2], "   ") {
+		t.Fatalf("body should be indented by 3 spaces: %q", out[2])
+	}
+	if !strings.Contains(out[4], "─") {
+		t.Fatalf("line4 should be separator: %q", out[4])
+	}
+	if !strings.Contains(out[5], "SUCCESSFUL") {
+		t.Fatalf("bottom bar should be build theme: %q", out[5])
+	}
+	if !strings.Contains(out[5], "ch.1/10") {
+		t.Fatalf("bottom bar should embed status: %q", out[5])
 	}
 }
