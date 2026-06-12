@@ -31,10 +31,26 @@ func TestReaderRenderExactHeightShellMode(t *testing.T) {
 		t.Fatalf("shell render must be exactly height(12), got %d", len(lines))
 	}
 	if !strings.Contains(lines[0], "tail -f") {
-		t.Fatalf("shell header missing, line0=%q", lines[0])
+		t.Fatalf("top bar missing, line0=%q", lines[0])
 	}
-	if !strings.Contains(lines[11], "watching") {
-		t.Fatalf("shell footer missing, last=%q", lines[11])
+	if !strings.Contains(lines[1], "─") {
+		t.Fatalf("line1 should be separator, got %q", lines[1])
+	}
+	if !strings.Contains(lines[11], "? help") {
+		t.Fatalf("bottom bar should show help hint, last=%q", lines[11])
+	}
+}
+
+func TestReaderJumpTo(t *testing.T) {
+	b := sampleBook()
+	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
+	r.JumpTo(1)
+	if r.Progress().Chapter != 1 || r.Progress().Line != 0 {
+		t.Fatalf("JumpTo(1) -> %+v want {1,0}", r.Progress())
+	}
+	r.JumpTo(99) // clamp
+	if r.Progress().Chapter != len(b.Chapters)-1 {
+		t.Fatalf("JumpTo(99) should clamp, got %+v", r.Progress())
 	}
 }
 

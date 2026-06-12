@@ -69,24 +69,39 @@ func (r *ReaderView) SetSize(width, height int) {
 	r.line = clampLine(r.line, r.chapterLineCount())
 }
 
-// contentWidth is the wrap width for novel body.
+// rightMargin keeps a small gutter on the right of shell-mode body text.
+const rightMargin = 1
+
+// contentWidth is the wrap width for novel body. In shell mode it reserves the
+// left indent (disguise.BodyIndent) plus a right margin so text breathes.
 func (r *ReaderView) contentWidth() int {
-	if r.width < 10 {
+	w := r.width
+	if r.mode == "shell" {
+		w -= disguise.BodyIndent + rightMargin
+	}
+	if w < 10 {
 		return 10
 	}
-	return r.width
+	return w
 }
 
-// bodyHeight is the number of novel-body lines per page (chrome excluded).
+// bodyHeight is the number of novel-body lines per page (chrome excluded). Shell
+// mode now has 4 decoration lines (top bar + 2 separators + bottom bar).
 func (r *ReaderView) bodyHeight() int {
 	h := r.height
 	if r.mode == "shell" {
-		h -= 2 // header + footer
+		h -= 4
 	}
 	if h < 1 {
 		return 1
 	}
 	return h
+}
+
+// JumpTo moves to the start of the given chapter (clamped).
+func (r *ReaderView) JumpTo(chapter int) {
+	r.chapter = clamp(chapter, 0, len(r.book.Chapters)-1)
+	r.line = 0
 }
 
 func (r *ReaderView) chapterLines() []string {
