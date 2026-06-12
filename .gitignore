@@ -1,0 +1,10 @@
+# Runtime data (bookshelf + imported epubs + progress)
+/data/
+
+# Built binaries
+/reader
+/reader.exe
+*.exe
+
+# Go test/coverage artifacts
+*.out
