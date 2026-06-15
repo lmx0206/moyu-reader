@@ -123,13 +123,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Boss screen swallows all keys: any key restores reading.
+	key := msg.String()
+
+	// Boss screen swallows all keys; only the boss key itself restores reading,
+	// so you can mash keys to look busy without revealing the novel.
 	if m.bossActive {
-		m.bossActive = false
+		if key == "`" || key == "b" {
+			m.bossActive = false
+		}
 		return m, nil
 	}
-
-	key := msg.String()
 
 	switch m.screen {
 	case screenImport:
@@ -242,6 +245,8 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 		m.reader.CycleStyle()
 	case "m":
 		m.reader.ToggleMode()
+	case "s":
+		m.reader.ToggleNav()
 	case "g":
 		if m.book != nil {
 			m.toc = NewTOCView(m.book, m.reader.Progress().Chapter)
@@ -338,8 +343,9 @@ func helpText() []string {
 		"KEYBINDINGS (reader):",
 		"  space/→/pgdn  next page      up/down  scroll line",
 		"  tab  switch profile          m        toggle view",
-		"  g    goto section            `/b      minimize",
-		"  ?    help                    esc      back to list",
+		"  s    scroll/page mode        g        goto section",
+		"  `/b  minimize (same key restores)     ?  help",
+		"  esc  back to list            q        quit",
 		"",
 		"KEYBINDINGS (stream/CLI):",
 		"  enter  next    b  back    t  switch profile    q  quit",
