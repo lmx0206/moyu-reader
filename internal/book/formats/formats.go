@@ -4,4 +4,5 @@ package formats
 
 import (
 	_ "moyureader/internal/book/epub"
+	_ "moyureader/internal/book/txt"
 )
