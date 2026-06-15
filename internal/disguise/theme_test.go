@@ -20,7 +20,7 @@ func TestThemeByNameFallback(t *testing.T) {
 }
 
 func TestNextStyleCycles(t *testing.T) {
-	if NextStyle("log") != "build" || NextStyle("build") != "git" || NextStyle("git") != "log" {
+	if NextStyle("log") != "build" || NextStyle("build") != "git" || NextStyle("git") != "docker" {
 		t.Fatal("style cycle wrong")
 	}
 }

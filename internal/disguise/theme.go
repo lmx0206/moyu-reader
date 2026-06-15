@@ -30,12 +30,15 @@ type Theme interface {
 }
 
 // styleOrder defines the Tab cycle order.
-var styleOrder = []string{"log", "build", "git"}
+var styleOrder = []string{"log", "build", "git", "docker", "npm", "pytest"}
 
 var registry = map[string]Theme{
-	"log":   logTheme{},
-	"build": buildTheme{},
-	"git":   gitTheme{},
+	"log":    logTheme{},
+	"build":  buildTheme{},
+	"git":    gitTheme{},
+	"docker": dockerTheme{},
+	"npm":    npmTheme{},
+	"pytest": pytestTheme{},
 }
 
 // ThemeByName returns the theme for name, falling back to "log" if unknown.
