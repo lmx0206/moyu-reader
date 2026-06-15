@@ -36,8 +36,37 @@ func TestReaderRenderExactHeightShellMode(t *testing.T) {
 	if !strings.Contains(lines[1], "─") {
 		t.Fatalf("line1 should be separator, got %q", lines[1])
 	}
+	// body line is indented by ReaderView now
+	if !strings.HasPrefix(lines[2], "   ") {
+		t.Fatalf("body line should be indented by 3 spaces: %q", lines[2])
+	}
 	if !strings.Contains(lines[11], "? help") {
 		t.Fatalf("bottom bar should show help hint, last=%q", lines[11])
+	}
+}
+
+func TestReaderStatusShowsChapterPages(t *testing.T) {
+	b := sampleBook()
+	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
+	if !strings.Contains(r.StatusText(), "本章 1/") {
+		t.Fatalf("status should show chapter page number: %q", r.StatusText())
+	}
+}
+
+func TestReaderScrollModeDrawsScrollbar(t *testing.T) {
+	b := sampleBook()
+	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
+	r.ToggleNav() // -> scroll
+	if r.Nav() != "scroll" {
+		t.Fatalf("ToggleNav should switch to scroll, got %q", r.Nav())
+	}
+	lines := r.Render()
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "█") && !strings.Contains(joined, "░") {
+		t.Fatalf("scroll mode should draw a scrollbar glyph:\n%s", joined)
+	}
+	if len(lines) != 12 {
+		t.Fatalf("scroll render must still be height(12), got %d", len(lines))
 	}
 }
 
