@@ -32,8 +32,16 @@ var (
 )
 
 // Register records a parser for a file extension (e.g. ".txt"). Backends call
-// this from init(). The last registration for an extension wins.
+// this from init(). The last registration for an extension wins. It panics on
+// misuse (a nil parser or an extension not starting with "."), following the
+// convention of stdlib init-time registries like database/sql.
 func Register(ext string, p Parser) {
+	if p == nil {
+		panic("book: Register called with nil parser for ext " + ext)
+	}
+	if ext == "" || ext[0] != '.' {
+		panic(`book: Register: ext must start with ".", got "` + ext + `"`)
+	}
 	mu.Lock()
 	registry[strings.ToLower(ext)] = p
 	mu.Unlock()

@@ -9,6 +9,11 @@ func TestOpenRoutesByExtensionCaseInsensitive(t *testing.T) {
 	Register(".zz1", func(path string) (*Book, error) {
 		return &Book{Title: "routed:" + path}, nil
 	})
+	t.Cleanup(func() {
+		mu.Lock()
+		delete(registry, ".zz1")
+		mu.Unlock()
+	})
 	b, err := Open("dir/sample.ZZ1") // 大写扩展名也应命中
 	if err != nil {
 		t.Fatal(err)
