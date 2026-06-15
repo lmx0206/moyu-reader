@@ -26,14 +26,20 @@ func fitLine(s string, width int) string {
 }
 
 // padBetween left-aligns left, right-aligns right, and fills the middle with
-// spaces so the whole line is exactly width display cells. If there is not
-// enough room, it keeps left and truncates to width.
+// spaces so the whole line is exactly width display cells. When there is not
+// enough room, it prefers keeping the right marker visible (e.g. the "? help"
+// hint), truncating the left to make space; if even the right marker plus a
+// separator does not fit, it truncates the whole line to width.
 func padBetween(left, right string, width int) string {
-	gap := width - render.StringWidth(left) - render.StringWidth(right)
-	if gap < 1 {
-		return fitLine(left, width)
+	lw := render.StringWidth(left)
+	rw := render.StringWidth(right)
+	if gap := width - lw - rw; gap >= 1 {
+		return left + strings.Repeat(" ", gap) + right
 	}
-	return left + strings.Repeat(" ", gap) + right
+	if rw+1 < width {
+		return fitLine(left, width-rw-1) + " " + right
+	}
+	return fitLine(left, width)
 }
 
 // separatorLine returns a horizontal rule of width box-drawing dashes.

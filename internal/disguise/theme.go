@@ -1,7 +1,19 @@
 // Package disguise renders novel text so it resembles developer tool output.
 package disguise
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
+
+// clockBase anchors fake log timestamps to the program's real start time so
+// they look like a process that is currently emitting logs.
+var clockBase = time.Now()
+
+// logClock formats base advanced by seed seconds as HH:MM:SS.
+func logClock(base time.Time, seed int) string {
+	return base.Add(time.Duration(seed) * time.Second).Format("15:04:05")
+}
 
 // Theme produces fake "work output" decoration for a given style.
 type Theme interface {
@@ -54,7 +66,7 @@ var logLevels = []string{"INFO", "DEBUG", "INFO", "WARN", "INFO"}
 var logClasses = []string{"OrderSvc", "CacheManager", "HttpPool", "AuthFilter", "TaskRunner"}
 
 func (logTheme) LinePrefix(seed int) string {
-	ts := fmt.Sprintf("%02d:%02d:%02d", 8+(seed/3600)%10, (seed/60)%60, seed%60)
+	ts := logClock(clockBase, seed)
 	lvl := logLevels[seed%len(logLevels)]
 	cls := logClasses[(seed/7)%len(logClasses)]
 	return fmt.Sprintf("[%s] %-5s %s - ", ts, lvl, cls)

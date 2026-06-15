@@ -39,11 +39,27 @@ func TestModelBossKeyToggles(t *testing.T) {
 	if !m.bossActive {
 		t.Fatal("backtick should activate boss screen")
 	}
-	// 老板键激活时，任意键恢复
+	// 普通键不退出
 	nm, _ = m.Update(keyRunes("x"))
 	m = nm.(*Model)
+	if !m.bossActive {
+		t.Fatal("ordinary key must NOT exit boss screen")
+	}
+	// 老板键退出
+	nm, _ = m.Update(keyRunes("`"))
+	m = nm.(*Model)
 	if m.bossActive {
-		t.Fatal("any key should deactivate boss screen")
+		t.Fatal("backtick again should exit boss screen")
+	}
+}
+
+func TestModelSTogglesNav(t *testing.T) {
+	m := newReaderModel(t)
+	start := m.reader.Nav()
+	nm, _ := m.Update(keyRunes("s"))
+	m = nm.(*Model)
+	if m.reader.Nav() == start {
+		t.Fatalf("s should toggle nav mode, still %q", m.reader.Nav())
 	}
 }
 

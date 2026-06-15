@@ -3,6 +3,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"moyureader/internal/disguise"
 	"moyureader/internal/epub"
@@ -19,6 +20,7 @@ type ReaderView struct {
 	height  int
 	style   string
 	mode    string
+	nav     string // "page" | "scroll"
 }
 
 // NewReaderView builds a reader at the given progress/prefs, clamped to valid
@@ -28,6 +30,7 @@ func NewReaderView(b *epub.Book, p store.Progress, prefs store.Prefs, width, hei
 		book:   b,
 		style:  orDefault(prefs.Style, "log"),
 		mode:   orDefault(prefs.Mode, "shell"),
+		nav:    "page",
 		width:  width,
 		height: height,
 	}
@@ -69,21 +72,37 @@ func (r *ReaderView) SetSize(width, height int) {
 	r.line = clampLine(r.line, r.chapterLineCount())
 }
 
-// rightMargin keeps a small gutter on the right of shell-mode body text.
+// BodyIndent is the left margin (spaces) applied to shell-mode body text.
+const BodyIndent = 3
+
+// rightMargin keeps a one-column gutter on the right (also where the scrollbar
+// is drawn in scroll mode).
 const rightMargin = 1
 
 // contentWidth is the wrap width for novel body. In shell mode it reserves the
-// left indent (disguise.BodyIndent) plus a right margin so text breathes.
+// left indent plus a right margin so text breathes.
 func (r *ReaderView) contentWidth() int {
 	w := r.width
 	if r.mode == "shell" {
-		w -= disguise.BodyIndent + rightMargin
+		w -= BodyIndent + rightMargin
 	}
 	if w < 10 {
 		return 10
 	}
 	return w
 }
+
+// ToggleNav flips page<->scroll navigation.
+func (r *ReaderView) ToggleNav() {
+	if r.nav == "scroll" {
+		r.nav = "page"
+	} else {
+		r.nav = "scroll"
+	}
+}
+
+// Nav returns the current navigation mode.
+func (r *ReaderView) Nav() string { return r.nav }
 
 // bodyHeight is the number of novel-body lines per page (chrome excluded). Shell
 // mode now has 4 decoration lines (top bar + 2 separators + bottom bar).
@@ -133,17 +152,41 @@ func (r *ReaderView) Render() []string {
 	if r.mode == "inline" {
 		return disguise.RenderInline(th, page, r.width)
 	}
-	return disguise.RenderShell(th, page, r.width, r.StatusText())
+
+	// shell mode: indent body; in scroll mode append a right-edge scrollbar.
+	indent := strings.Repeat(" ", BodyIndent)
+	var bars []string
+	if r.nav == "scroll" {
+		bars = render.Scrollbar(len(lines), r.line, bh)
+	}
+	body := make([]string, bh)
+	for i := 0; i < bh; i++ {
+		text := indent + page[i]
+		if r.nav == "scroll" {
+			text = render.PadRight(text, r.width-1) + bars[i]
+		}
+		body[i] = text
+	}
+	return disguise.RenderShell(th, body, r.width, r.StatusText())
 }
 
-// StatusText is the chrome status, e.g. "ch.1/2 · 0%".
+// StatusText is the chrome status, e.g. "ch.1/2 · 本章 1/3页 · 0%".
 func (r *ReaderView) StatusText() string {
-	total := len(r.book.Chapters)
+	totalCh := len(r.book.Chapters)
 	pct := 0
-	if total > 0 {
-		pct = r.chapter * 100 / total
+	if totalCh > 0 {
+		pct = r.chapter * 100 / totalCh
 	}
-	return fmt.Sprintf("ch.%d/%d · %d%%", r.chapter+1, total, pct)
+	bh := r.bodyHeight()
+	totalPages := (r.chapterLineCount() + bh - 1) / bh
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	page := r.line/bh + 1
+	if page > totalPages {
+		page = totalPages
+	}
+	return fmt.Sprintf("ch.%d/%d · 本章 %d/%d页 · %d%%", r.chapter+1, totalCh, page, totalPages, pct)
 }
 
 func lastPageStart(n, h int) int {

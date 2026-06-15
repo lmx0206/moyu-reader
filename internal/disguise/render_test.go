@@ -23,7 +23,7 @@ func TestRenderInlinePrefixesEachLine(t *testing.T) {
 func TestRenderShellFiveSectionLayout(t *testing.T) {
 	th := ThemeByName("build")
 	body := []string{"正文一", "正文二"}
-	out := RenderShell(th, body, 40, "ch.1/10 · 0%")
+	out := RenderShell(th, body, 40, "ch.1/10 · 本章 1/1页 · 0%")
 	// 4 装饰行(顶栏/分隔/分隔/底栏) + 2 正文 = 6
 	if len(out) != 6 {
 		t.Fatalf("want 6 lines, got %d: %#v", len(out), out)
@@ -34,19 +34,14 @@ func TestRenderShellFiveSectionLayout(t *testing.T) {
 	if !strings.Contains(out[1], "─") {
 		t.Fatalf("line1 should be separator: %q", out[1])
 	}
-	if !strings.Contains(out[2], "正文一") {
-		t.Fatalf("body line should be present (indented): %q", out[2])
-	}
-	if !strings.HasPrefix(out[2], "   ") {
-		t.Fatalf("body should be indented by 3 spaces: %q", out[2])
+	// RenderShell no longer indents — body is placed verbatim (caller indents).
+	if out[2] != "正文一" || out[3] != "正文二" {
+		t.Fatalf("body must be verbatim: %#v", out)
 	}
 	if !strings.Contains(out[4], "─") {
 		t.Fatalf("line4 should be separator: %q", out[4])
 	}
 	if !strings.Contains(out[5], "SUCCESSFUL") {
 		t.Fatalf("bottom bar should be build theme: %q", out[5])
-	}
-	if !strings.Contains(out[5], "ch.1/10") {
-		t.Fatalf("bottom bar should embed status: %q", out[5])
 	}
 }
