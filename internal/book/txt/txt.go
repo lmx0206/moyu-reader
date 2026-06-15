@@ -22,18 +22,20 @@ func init() { book.Register(".txt", Parse) }
 var bom = []byte{0xEF, 0xBB, 0xBF}
 
 // headingRE matches typical Chinese chapter headings at the start of a line.
-var headingRE = regexp.MustCompile(`^第\s*[0-9零一二三四五六七八九十百千万两]+\s*[章回卷节话篇集部]|^(序章|序言|楔子|引子|前言|后记|尾声|终章|番外|附录)`)
+var headingRE = regexp.MustCompile(`^第\s*[0-9零〇一二三四五六七八九十百千万两]+\s*[章回卷节话篇集部]|^(?:序章|序言|楔子|引子|前言|后记|尾声|终章|番外|附录)`)
 
-// headingMaxWidth guards against ordinary sentences that merely contain a
-// chapter-like phrase: a real heading line is short.
-const headingMaxWidth = 30
+// headingMaxWidth guards against ordinary prose that merely contains a
+// chapter-like phrase: a real heading line is short. It is generous enough to
+// allow a chapter number plus a subtitle (e.g. "第一章 我被陷害了，竟然穿越到了古代").
+const headingMaxWidth = 50
 
-// decode turns raw bytes into a UTF-8 string, handling a UTF-8 BOM and
-// falling back to GB18030 (a GBK superset) for non-UTF-8 input.
+// decode turns raw bytes into a UTF-8 string. It strips a UTF-8 BOM if present,
+// uses the bytes directly when they are valid UTF-8, and otherwise falls back to
+// GB18030 (a GBK superset) — the common encoding for Chinese .txt files. The
+// GB18030 decoder replaces invalid bytes rather than erroring, so the err path
+// is defensive only.
 func decode(data []byte) (string, error) {
-	if bytes.HasPrefix(data, bom) {
-		return string(data[len(bom):]), nil
-	}
+	data = bytes.TrimPrefix(data, bom)
 	if utf8.Valid(data) {
 		return string(data), nil
 	}
@@ -44,6 +46,10 @@ func decode(data []byte) (string, error) {
 	return string(out), nil
 }
 
+// isHeading reports whether a line is a chapter heading. The width guard rejects
+// long prose lines; the regex matches common Chinese heading forms. Callers pass
+// the fully-trimmed line for detection, while the right-trimmed line is kept as
+// the paragraph/title text.
 func isHeading(line string) bool {
 	return render.StringWidth(line) <= headingMaxWidth && headingRE.MatchString(line)
 }

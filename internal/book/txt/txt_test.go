@@ -100,3 +100,47 @@ func TestParseCRLF(t *testing.T) {
 		t.Fatalf("CRLF not normalized: %+v", b.Chapters[0])
 	}
 }
+
+func TestParseHeadingWithSubtitle(t *testing.T) {
+	p := write(t, "f.txt", []byte("第一章 我被陷害了，竟然穿越到了古代\n正文\n"))
+	b, err := Parse(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.Chapters) != 1 || b.Chapters[0].Title != "第一章 我被陷害了，竟然穿越到了古代" {
+		t.Fatalf("chapter-with-subtitle heading not recognized: %+v", b.Chapters)
+	}
+	if len(b.Chapters[0].Paragraphs) != 1 || b.Chapters[0].Paragraphs[0] != "正文" {
+		t.Fatalf("paragraph wrong: %+v", b.Chapters[0])
+	}
+}
+
+func TestParseEmptyFile(t *testing.T) {
+	p := write(t, "g.txt", []byte(""))
+	b, err := Parse(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.Chapters) != 1 {
+		t.Fatalf("empty file should yield a single chapter, got %d", len(b.Chapters))
+	}
+	if len(b.Chapters[0].Paragraphs) != 0 {
+		t.Fatalf("empty file chapter should have no paragraphs, got %+v", b.Chapters[0].Paragraphs)
+	}
+}
+
+func TestParseBOMWithGBKBytes(t *testing.T) {
+	gbk, _, err := transform.Bytes(simplifiedchinese.GB18030.NewEncoder(), []byte("第一章\n正文\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := append([]byte{0xEF, 0xBB, 0xBF}, gbk...)
+	p := write(t, "h.txt", data)
+	b, err := Parse(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Chapters[0].Title != "第一章" {
+		t.Fatalf("BOM+GBK should still decode via GB18030 fallback: %+v", b.Chapters[0])
+	}
+}
