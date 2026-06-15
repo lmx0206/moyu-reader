@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -95,7 +96,11 @@ func (s *Store) Import(lib *Library, srcPath, title, author string) (*BookEntry,
 		return nil, err
 	}
 	id := newID()
-	rel := filepath.Join("books", id+".epub")
+	ext := strings.ToLower(filepath.Ext(srcPath))
+	if ext == "" {
+		ext = ".epub"
+	}
+	rel := filepath.Join("books", id+ext)
 	dst := filepath.Join(s.dir, rel)
 	if err := copyFile(srcPath, dst); err != nil {
 		return nil, err
