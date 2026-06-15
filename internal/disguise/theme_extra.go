@@ -11,7 +11,7 @@ func (dockerTheme) Name() string { return "docker" }
 var dockerSvcs = []string{"web", "api", "worker", "redis", "db"}
 
 func (dockerTheme) LinePrefix(seed int) string {
-	return fmt.Sprintf("moyu-%s-1| ", dockerSvcs[seed%len(dockerSvcs)])
+	return fmt.Sprintf("app-%s-1| ", dockerSvcs[seed%len(dockerSvcs)])
 }
 func (dockerTheme) Header(width int, status string) string {
 	return padBetween("docker compose up", "● running", width)
@@ -19,8 +19,8 @@ func (dockerTheme) Header(width int, status string) string {
 func (dockerTheme) Footer(width int, status string) string {
 	return padBetween("[+] Running 5/5 · "+status, "? help", width)
 }
-func (dockerTheme) BossLine(seed int) string {
-	return fitLine(dockerTheme{}.LinePrefix(seed)+bossPayload[seed%len(bossPayload)], 0)
+func (t dockerTheme) BossLine(seed int) string {
+	return fitLine(t.LinePrefix(seed)+bossPayload[seed%len(bossPayload)], 0)
 }
 
 // --- npm theme ---
@@ -38,8 +38,8 @@ func (npmTheme) Header(width int, status string) string {
 func (npmTheme) Footer(width int, status string) string {
 	return padBetween("added 1287 packages in 14s · "+status, "? help", width)
 }
-func (npmTheme) BossLine(seed int) string {
-	return fitLine(npmTheme{}.LinePrefix(seed)+bossPayload[seed%len(bossPayload)], 0)
+func (t npmTheme) BossLine(seed int) string {
+	return fitLine(t.LinePrefix(seed)+bossPayload[seed%len(bossPayload)], 0)
 }
 
 // --- pytest theme ---
@@ -59,6 +59,6 @@ func (pytestTheme) Header(width int, status string) string {
 func (pytestTheme) Footer(width int, status string) string {
 	return padBetween("== 142 passed in 3.21s == · "+status, "? help", width)
 }
-func (pytestTheme) BossLine(seed int) string {
-	return fitLine(pytestTheme{}.LinePrefix(seed)+bossPayload[seed%len(bossPayload)], 0)
+func (t pytestTheme) BossLine(seed int) string {
+	return fitLine(t.LinePrefix(seed)+bossPayload[seed%len(bossPayload)], 0)
 }
