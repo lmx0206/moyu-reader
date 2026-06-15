@@ -7,8 +7,8 @@ import (
 	"io"
 	"strings"
 
+	"moyureader/internal/book"
 	"moyureader/internal/disguise"
-	"moyureader/internal/epub"
 	"moyureader/internal/render"
 	"moyureader/internal/store"
 )
@@ -17,7 +17,7 @@ const wrapWidth = 80
 
 // Streamer emits successive inline-disguised chunks of a book.
 type Streamer struct {
-	book    *epub.Book
+	book    *book.Book
 	chapter int
 	line    int
 	style   string
@@ -25,7 +25,7 @@ type Streamer struct {
 }
 
 // NewStreamer starts at the given progress.
-func NewStreamer(b *epub.Book, p store.Progress, style string, height int) *Streamer {
+func NewStreamer(b *book.Book, p store.Progress, style string, height int) *Streamer {
 	if height < 1 {
 		height = 1
 	}

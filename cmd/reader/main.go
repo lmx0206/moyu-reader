@@ -5,7 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"moyureader/internal/epub"
+	"moyureader/internal/book"
+	_ "moyureader/internal/book/formats"
 	"moyureader/internal/store"
 	"moyureader/internal/stream"
 	"moyureader/internal/ui"
@@ -58,11 +59,11 @@ func runList(lib *store.Library) {
 }
 
 func importPath(st *store.Store, lib *store.Library, path string) (*store.BookEntry, error) {
-	book, err := epub.Parse(path)
+	bk, err := book.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	entry, err := st.Import(lib, path, book.Title, book.Author)
+	entry, err := st.Import(lib, path, bk.Title, bk.Author)
 	if err != nil {
 		return nil, err
 	}
@@ -107,12 +108,12 @@ func runStream(st *store.Store, lib *store.Library, idOrEmpty string) {
 		fmt.Fprintln(os.Stderr, "没有可续读的书。先用 reader <某本书.epub> 导入。")
 		os.Exit(1)
 	}
-	book, err := epub.Parse(filepath.Join(st.Dir(), filepath.FromSlash(entry.File)))
+	bk, err := book.Open(filepath.Join(st.Dir(), filepath.FromSlash(entry.File)))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "解析失败:", err)
 		os.Exit(1)
 	}
-	s := stream.NewStreamer(book, entry.Progress, entry.Prefs.Style, 18)
+	s := stream.NewStreamer(bk, entry.Progress, entry.Prefs.Style, 18)
 	stream.Run(s, os.Stdin, os.Stdout, func(p store.Progress, style string) {
 		store.UpdateProgress(lib, entry.ID, p, store.Prefs{Style: style, Mode: "inline"})
 		_ = st.Save(lib)

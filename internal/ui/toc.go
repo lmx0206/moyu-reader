@@ -3,7 +3,7 @@ package ui
 import (
 	"fmt"
 
-	"moyureader/internal/epub"
+	"moyureader/internal/book"
 )
 
 // TOCView is a scrollable chapter list disguised as a code outline.
@@ -14,7 +14,7 @@ type TOCView struct {
 }
 
 // NewTOCView builds a TOC with the cursor on the current chapter.
-func NewTOCView(b *epub.Book, current int) *TOCView {
+func NewTOCView(b *book.Book, current int) *TOCView {
 	titles := make([]string, len(b.Chapters))
 	for i, c := range b.Chapters {
 		titles[i] = c.Title
