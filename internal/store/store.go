@@ -88,9 +88,10 @@ func newID() string {
 	return hex.EncodeToString(b[:])
 }
 
-// Import copies the epub at srcPath into <data>/books/<id>.epub and appends a
-// new BookEntry to lib (caller is responsible for Save). Title/author come from
-// the parsed book (passed in to keep store free of an epub dependency).
+// Import copies srcPath into <data>/books/<id><ext>, preserving the source
+// extension (lowercased, defaulting to .epub if none), and appends a new
+// BookEntry to lib (caller is responsible for Save). Title/author come from the
+// parsed book (passed in to keep store free of a format dependency).
 func (s *Store) Import(lib *Library, srcPath, title, author string) (*BookEntry, error) {
 	if err := os.MkdirAll(s.BooksDir(), 0o755); err != nil {
 		return nil, err
