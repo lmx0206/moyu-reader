@@ -5,19 +5,19 @@ import (
 	"strings"
 	"testing"
 
-	"moyureader/internal/epub"
+	"moyureader/internal/book"
 	"moyureader/internal/store"
 )
 
-func sampleBook() *epub.Book {
-	mk := func(title string, n int) epub.Chapter {
+func sampleBook() *book.Book {
+	mk := func(title string, n int) book.Chapter {
 		ps := []string{title}
 		for i := 0; i < n; i++ {
 			ps = append(ps, strings.Repeat("文", 20))
 		}
-		return epub.Chapter{Title: title, Paragraphs: ps}
+		return book.Chapter{Title: title, Paragraphs: ps}
 	}
-	return &epub.Book{Title: "样书", Chapters: []epub.Chapter{mk("第一章", 30)}}
+	return &book.Book{Title: "样书", Chapters: []book.Chapter{mk("第一章", 30)}}
 }
 
 func TestStreamerNextAdvances(t *testing.T) {

@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"moyureader/internal/book"
 	"moyureader/internal/disguise"
-	"moyureader/internal/epub"
 	"moyureader/internal/render"
 	"moyureader/internal/store"
 )
 
 // ReaderView holds reading position and renders the disguised page.
 type ReaderView struct {
-	book    *epub.Book
+	book    *book.Book
 	chapter int
 	line    int // top display-line index within current chapter
 	width   int
@@ -25,7 +25,7 @@ type ReaderView struct {
 
 // NewReaderView builds a reader at the given progress/prefs, clamped to valid
 // bounds. width/height are terminal dimensions.
-func NewReaderView(b *epub.Book, p store.Progress, prefs store.Prefs, width, height int) *ReaderView {
+func NewReaderView(b *book.Book, p store.Progress, prefs store.Prefs, width, height int) *ReaderView {
 	r := &ReaderView{
 		book:   b,
 		style:  orDefault(prefs.Style, "log"),

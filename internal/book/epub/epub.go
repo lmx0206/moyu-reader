@@ -5,23 +5,14 @@ import (
 	"archive/zip"
 	"io"
 	"path"
+
+	"moyureader/internal/book"
 )
 
-// Book is a fully parsed EPUB ready for rendering.
-type Book struct {
-	Title    string
-	Author   string
-	Chapters []Chapter
-}
-
-// Chapter is one spine item reduced to plain-text paragraphs.
-type Chapter struct {
-	Title      string
-	Paragraphs []string
-}
+func init() { book.Register(".epub", Parse) }
 
 // Parse opens an EPUB file and returns the fully parsed Book.
-func Parse(filename string) (*Book, error) {
+func Parse(filename string) (*book.Book, error) {
 	zr, err := zip.OpenReader(filename)
 	if err != nil {
 		return nil, err
@@ -50,7 +41,7 @@ func Parse(filename string) (*Book, error) {
 		return nil, err
 	}
 
-	book := &Book{Title: meta.Title, Author: meta.Author}
+	b := &book.Book{Title: meta.Title, Author: meta.Author}
 	for _, href := range hrefs {
 		data, err := readZipFile(files[href])
 		if err != nil {
@@ -61,9 +52,9 @@ func Parse(filename string) (*Book, error) {
 			continue
 		}
 		title := paras[0]
-		book.Chapters = append(book.Chapters, Chapter{Title: title, Paragraphs: paras})
+		b.Chapters = append(b.Chapters, book.Chapter{Title: title, Paragraphs: paras})
 	}
-	return book, nil
+	return b, nil
 }
 
 // readZipFile reads the full contents of a zip entry, erroring if it is nil.

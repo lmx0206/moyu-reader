@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"moyureader/internal/book"
 	"moyureader/internal/disguise"
-	"moyureader/internal/epub"
 	"moyureader/internal/store"
 )
 
@@ -39,7 +39,7 @@ type Model struct {
 
 	shelf  *ShelfView
 	reader *ReaderView
-	book   *epub.Book
+	book   *book.Book
 	bookID string
 
 	toc        *TOCView
@@ -78,15 +78,15 @@ func (m *Model) openBook(id string) {
 		m.status = "找不到这本书"
 		return
 	}
-	book, err := epub.Parse(filepath.Join(m.st.Dir(), filepath.FromSlash(e.File)))
+	bk, err := book.Open(filepath.Join(m.st.Dir(), filepath.FromSlash(e.File)))
 	if err != nil {
 		e.Broken = true
 		_ = m.st.Save(m.lib)
 		m.status = "这本书打不开（已标记损坏）"
 		return
 	}
-	m.reader = NewReaderView(book, e.Progress, e.Prefs, m.width, m.height)
-	m.book = book
+	m.reader = NewReaderView(bk, e.Progress, e.Prefs, m.width, m.height)
+	m.book = bk
 	m.bookID = id
 	m.screen = screenReader
 }
@@ -280,19 +280,19 @@ func (m *Model) doImport(path string) {
 	if path == "" {
 		return
 	}
-	book, err := epub.Parse(path)
+	bk, err := book.Open(path)
 	if err != nil {
 		m.status = "解析失败: " + err.Error()
 		return
 	}
-	if _, err := m.st.Import(m.lib, path, book.Title, book.Author); err != nil {
+	if _, err := m.st.Import(m.lib, path, bk.Title, bk.Author); err != nil {
 		m.status = "导入失败: " + err.Error()
 		return
 	}
 	_ = m.st.Save(m.lib)
 	m.shelf = NewShelfView(m.lib)
 	m.screen = screenShelf
-	m.status = "已导入: " + book.Title
+	m.status = "已导入: " + bk.Title
 }
 
 func (m *Model) View() string {
