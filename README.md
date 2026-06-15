@@ -1,33 +1,91 @@
 # moyu-reader · 摸鱼终端阅读器
 
-在终端里读 EPUB 小说，远看像在跑日志/编译/看 diff 的摸鱼神器。
+在终端里读 EPUB 小说，远看像在跑日志 / 编译 / 看 git diff 的「摸鱼神器」。
+单文件 `.exe`、零依赖、可放 U 盘随身带；支持全屏 TUI 与内联流式两种用法。
 
-## 构建
+## 特性
 
-需要 Go（本机在 `D:\develop\Go`）：
+- 📖 **EPUB 阅读**：导入 epub、记忆每本书的阅读进度、重开自动续读
+- 🕵️ **三层伪装**
+  - 阅读模式 A（外壳）：日志查看器外观，正文正常排版、舒服读
+  - 阅读模式 B（内联）：每行正文伪装成带真实时间戳的日志行
+  - 老板键：满屏自动滚动的假日志，**只有老板键本身能退出**（可随便敲键装忙）
+- 🎭 **三种伪装风格**：日志 `log` / 构建 `build` / `git`，`Tab` 循环切换
+- 🧭 **翻页 / 滚动双模式**：`s` 切换；滚动模式右侧带滚动条
+- 📑 **目录跳转**：`g` 弹出「代码大纲」样式章节列表，回车跳章
+- ❓ **帮助键**：`?` 弹出伪装成 `--help` 的快捷键说明
+- 📊 状态栏显示章节进度与本章页码
 
-    go build -ldflags "-s -w" -o reader.exe ./cmd/reader
+## 安装
 
-产物是单文件 `reader.exe`，零依赖，拷到任意 Windows 机器即用。数据存在 exe 同级的 `data/` 文件夹（可用环境变量 `MOYU_DATA` 改）。
+### 方式一：直接下载（推荐）
+到 [Releases](https://github.com/lmx0206/moyu-reader/releases) 下载最新 `reader.exe`，双击即用。
+
+### 方式二：自行编译
+需要 Go 1.26+：
+```
+go build -ldflags "-s -w" -o reader.exe ./cmd/reader
+```
+产物是单文件 `reader.exe`。数据（书架 + 进度 + 导入的 epub）存在 exe 同级的 `data/` 文件夹，可用环境变量 `MOYU_DATA` 改到别处。
+
+> 小贴士：可把 exe 改名成 `tail.exe` / `gradlew.exe`，进程列表里更不显眼。
 
 ## 用法
 
-    reader.exe                 打开全屏 TUI（书架）
-    reader.exe 某本书.epub      导入并直接阅读
-    reader.exe import 路径.epub  仅导入到书架
-    reader.exe list            列出书架
-    reader.exe stream [id]      内联流式模式（在集成终端里像一条吐日志的命令）
+```
+reader.exe                 打开全屏 TUI（书架）
+reader.exe 某本书.epub      导入并直接阅读
+reader.exe import 路径.epub  仅导入到书架
+reader.exe list            列出书架
+reader.exe stream [id]      内联流式模式（在集成终端里像一条吐日志的命令）
+```
 
-## 阅读快捷键（全屏 TUI）
+## 快捷键
 
-- `Space`/`→`/`PgDn` 翻页 · `↑↓` 行滚动
-- `Tab` 切伪装风格（log/build/git）
-- `m` 切阅读模式（外壳伪装 / 正文藏日志行）
-- `` ` `` 或 `b` 老板键（满屏假日志，任意键返回）
-- `i` 导入 · `d` 删除 · `Esc` 回书架 · `q` 退出
+### 书架
+| 键 | 作用 |
+|----|------|
+| `↑` `↓` | 选择 |
+| `Enter` | 打开阅读 |
+| `i` | 导入 .epub（输入路径） |
+| `d` | 删除 |
+| `?` | 帮助 |
+| `q` | 退出 |
 
-## 内联流式模式
+### 阅读
+| 键 | 作用 |
+|----|------|
+| `Space` `→` `PgDn` | 下一页 |
+| `←` `PgUp` | 上一页 |
+| `↑` `↓` | 逐行滚动 |
+| `s` | 翻页 / 滚动模式切换 |
+| `Tab` | 切伪装风格（log/build/git） |
+| `m` | 切阅读模式（外壳 / 内联） |
+| `g` | 目录跳转 |
+| `` ` `` 或 `b` | 老板键（再按一次返回） |
+| `?` | 帮助 |
+| `Esc` | 回书架 |
 
-    reader.exe stream
+### 内联流式模式
+| 输入 | 作用 |
+|------|------|
+| 回车 | 下一段 |
+| `b` | 回退 |
+| `t` | 切风格 |
+| `q` | 退出 |
 
-回车出下一段；`b` 回退；`t` 切风格；`q` 退出。退出自动存进度。
+## 发布新版本
+
+打一个 `v*` tag 并推送，GitHub Actions 会自动交叉编译 `reader.exe` 并发到 Releases：
+```
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+## 开发
+
+```
+go test ./...     # 跑全部测试
+go vet ./...      # 静态检查
+```
+CI（`.github/workflows/ci.yml`）会在每次 push / PR 自动跑测试。
