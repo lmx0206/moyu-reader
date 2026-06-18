@@ -20,6 +20,8 @@ const (
 	screenImport
 	screenTOC
 	screenHelp
+	screenAnnotate
+	screenAnnotList
 )
 
 // bossTickMsg drives the boss-screen auto-scroll.
@@ -43,12 +45,14 @@ type Model struct {
 	bookID string
 
 	toc        *TOCView
+	annot      *AnnotationView
 	helpReturn screen
 
 	bossActive bool
 	bossTick   int
 
 	importBuf string // typed path in import screen
+	annotBuf  string // typed note in annotate screen
 	status    string // transient status line (errors etc.)
 }
 
@@ -142,6 +146,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case screenTOC:
 		return m.handleTOCKey(key)
+	case screenAnnotate:
+		return m.handleAnnotateKey(msg)
+	case screenAnnotList:
+		return m.handleAnnotListKey(key)
 	}
 
 	// Help is available from shelf and reader.
@@ -177,6 +185,61 @@ func (m *Model) handleTOCKey(key string) (tea.Model, tea.Cmd) {
 		m.reader.JumpTo(m.toc.Selected())
 		m.saveProgress()
 		m.screen = screenReader
+	case "esc", "q":
+		m.screen = screenReader
+	}
+	return m, nil
+}
+
+func (m *Model) handleAnnotateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.screen = screenReader
+	case "enter":
+		p := m.reader.Progress()
+		store.AddAnnotation(m.lib, m.bookID, store.Annotation{
+			Chapter:   p.Chapter,
+			Para:      p.Para,
+			Note:      strings.TrimSpace(m.annotBuf),
+			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		})
+		_ = m.st.Save(m.lib)
+		m.screen = screenReader
+		m.status = "已加标注"
+	case "backspace":
+		if n := len(m.annotBuf); n > 0 {
+			m.annotBuf = m.annotBuf[:n-1]
+		}
+	default:
+		if msg.Type == tea.KeyRunes {
+			m.annotBuf += string(msg.Runes)
+		} else if msg.Type == tea.KeySpace {
+			m.annotBuf += " "
+		}
+	}
+	return m, nil
+}
+
+func (m *Model) handleAnnotListKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "up", "k":
+		m.annot.MoveUp()
+	case "down", "j":
+		m.annot.MoveDown()
+	case "enter":
+		if a, ok := m.annot.Selected(); ok {
+			m.reader.JumpToPara(a.Chapter, a.Para)
+			m.saveProgress()
+		}
+		m.screen = screenReader
+	case "d":
+		if _, ok := m.annot.Selected(); ok {
+			store.DeleteAnnotation(m.lib, m.bookID, m.annot.Index())
+			_ = m.st.Save(m.lib)
+			if e := m.lib.FindByID(m.bookID); e != nil {
+				m.annot = NewAnnotationView(m.book, e.Annotations)
+			}
+		}
 	case "esc", "q":
 		m.screen = screenReader
 	}
@@ -247,6 +310,14 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 		m.reader.ToggleMode()
 	case "s":
 		m.reader.ToggleNav()
+	case "a":
+		m.annotBuf = ""
+		m.screen = screenAnnotate
+	case "l":
+		if e := m.lib.FindByID(m.bookID); e != nil && m.book != nil {
+			m.annot = NewAnnotationView(m.book, e.Annotations)
+			m.screen = screenAnnotList
+		}
 	case "g":
 		if m.book != nil {
 			m.toc = NewTOCView(m.book, m.reader.Progress().Chapter)
@@ -313,6 +384,10 @@ func (m *Model) View() string {
 		return strings.Join(paintDim(helpText()), "\n")
 	case screenImport:
 		return "导入 EPUB（粘贴 .epub 完整路径后回车，Esc 取消）:\n\n> " + m.importBuf + "\n\n" + m.status
+	case screenAnnotList:
+		return strings.Join(paintDim(m.annot.Render(m.width, m.height)), "\n")
+	case screenAnnotate:
+		return "加标注（批注可留空 = 书签，回车保存，Esc 取消）:\n\n> " + m.annotBuf
 	default:
 		body := m.shelf.Render(m.width, m.height-1)
 		if m.status != "" {
@@ -344,6 +419,7 @@ func helpText() []string {
 		"  space/→/pgdn  next page      up/down  scroll line",
 		"  tab  switch profile          m        toggle view",
 		"  s    scroll/page mode        g        goto section",
+		"  a    add bookmark/note       l        list bookmarks",
 		"  `/b  minimize (same key restores)     ?  help",
 		"  esc  back to list            q        quit",
 		"",

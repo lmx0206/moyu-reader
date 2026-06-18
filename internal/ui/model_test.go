@@ -135,3 +135,46 @@ func TestModelHelpKeyOpensAndCloses(t *testing.T) {
 func contains(haystack, needle string) bool {
 	return strings.Contains(haystack, needle)
 }
+
+func TestModelAddAnnotation(t *testing.T) {
+	m := newReaderModel(t)
+	m.lib.Books = append(m.lib.Books, store.BookEntry{ID: "x"}) // bookID is "x"
+	nm, _ := m.Update(keyRunes("a"))
+	m = nm.(*Model)
+	if m.screen != screenAnnotate {
+		t.Fatalf("a should open annotate screen, got %v", m.screen)
+	}
+	nm, _ = m.Update(keyRunes("hi"))
+	m = nm.(*Model)
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(*Model)
+	e := m.lib.FindByID("x")
+	if e == nil || len(e.Annotations) != 1 || e.Annotations[0].Note != "hi" {
+		t.Fatalf("annotation not saved: %+v", e)
+	}
+}
+
+func TestModelAnnotationListJumpAndDelete(t *testing.T) {
+	m := newReaderModel(t)
+	m.lib.Books = append(m.lib.Books, store.BookEntry{
+		ID:          "x",
+		Annotations: []store.Annotation{{Chapter: 1, Para: 0, Note: "n"}},
+	})
+	nm, _ := m.Update(keyRunes("l"))
+	m = nm.(*Model)
+	if m.screen != screenAnnotList || m.annot == nil {
+		t.Fatalf("l should open annotation list")
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(*Model)
+	if m.reader.Progress().Chapter != 1 {
+		t.Fatalf("enter should jump to ch1, got %d", m.reader.Progress().Chapter)
+	}
+	nm, _ = m.Update(keyRunes("l"))
+	m = nm.(*Model)
+	nm, _ = m.Update(keyRunes("d"))
+	m = nm.(*Model)
+	if e := m.lib.FindByID("x"); e == nil || len(e.Annotations) != 0 {
+		t.Fatalf("d should delete annotation: %+v", e)
+	}
+}
