@@ -49,6 +49,9 @@ func (av *AnnotationView) summary(a store.Annotation) string {
 	if a.Note != "" {
 		return a.Note
 	}
+	if av.book == nil {
+		return ""
+	}
 	if a.Chapter >= 0 && a.Chapter < len(av.book.Chapters) {
 		ps := av.book.Chapters[a.Chapter].Paragraphs
 		if a.Para >= 0 && a.Para < len(ps) {
