@@ -23,6 +23,7 @@ const (
 	screenHelp
 	screenAnnotate
 	screenAnnotList
+	screenStats
 )
 
 // bossTickMsg drives the boss-screen auto-scroll.
@@ -45,16 +46,18 @@ type Model struct {
 	book   *book.Book
 	bookID string
 
-	toc        *TOCView
-	annot      *AnnotationView
-	helpReturn screen
+	toc         *TOCView
+	annot       *AnnotationView
+	helpReturn  screen
+	statsReturn screen
 
 	bossActive bool
 	bossTick   int
 
-	importBuf string // typed path in import screen
-	annotBuf  string // typed note in annotate screen
-	status    string // transient status line (errors etc.)
+	importBuf    string    // typed path in import screen
+	annotBuf     string    // typed note in annotate screen
+	status       string    // transient status line (errors etc.)
+	lastActivity time.Time // for accumulating reading time
 }
 
 // NewModel builds the root model. If openID is non-empty, it opens that book
@@ -90,18 +93,27 @@ func (m *Model) openBook(id string) {
 		m.status = "这本书打不开（已标记损坏）"
 		return
 	}
+	if e.TotalChars == 0 {
+		e.TotalChars = book.TotalChars(bk)
+	}
 	m.reader = NewReaderView(bk, e.Progress, e.Prefs, m.width, m.height)
 	m.book = bk
 	m.bookID = id
+	m.lastActivity = time.Time{}
 	m.screen = screenReader
 }
 
-// saveProgress persists the current reader position + prefs.
+// saveProgress persists the current reader position + prefs and advances the
+// per-book reading high-water mark.
 func (m *Model) saveProgress() {
 	if m.reader == nil || m.bookID == "" {
 		return
 	}
-	store.UpdateProgress(m.lib, m.bookID, m.reader.Progress(), m.reader.Prefs())
+	p := m.reader.Progress()
+	store.UpdateProgress(m.lib, m.bookID, p, m.reader.Prefs())
+	if m.book != nil {
+		store.RecordReading(m.lib, m.bookID, p.Chapter, p.Para, book.CharsUpTo(m.book, p.Chapter, p.Para))
+	}
 	_ = m.st.Save(m.lib)
 }
 
@@ -151,6 +163,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleAnnotateKey(msg)
 	case screenAnnotList:
 		return m.handleAnnotListKey(key)
+	case screenStats:
+		return m.handleStatsKey(key)
 	}
 
 	// Help is available from shelf and reader.
@@ -248,6 +262,14 @@ func (m *Model) handleAnnotListKey(key string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) handleStatsKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "esc", "q", "c":
+		m.screen = m.statsReturn
+	}
+	return m, nil
+}
+
 func (m *Model) handleShelfKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "q", "ctrl+c":
@@ -266,6 +288,9 @@ func (m *Model) handleShelfKey(key string) (tea.Model, tea.Cmd) {
 		m.status = ""
 	case "d":
 		m.deleteSelected()
+	case "c":
+		m.statsReturn = screenShelf
+		m.screen = screenStats
 	}
 	return m, nil
 }
@@ -288,7 +313,11 @@ func (m *Model) deleteSelected() {
 }
 
 func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
+	m.recordActivity()
 	switch key {
+	case "c":
+		m.statsReturn = screenReader
+		m.screen = screenStats
 	case "q", "esc":
 		m.saveProgress()
 		m.screen = screenShelf
@@ -387,6 +416,8 @@ func (m *Model) View() string {
 		return strings.Join(paintDim(helpText()), "\n")
 	case screenImport:
 		return "导入 EPUB（粘贴 .epub 完整路径后回车，Esc 取消）:\n\n> " + m.importBuf + "\n\n" + m.status
+	case screenStats:
+		return strings.Join(paintDim((StatsView{}).Render(m.lib, m.width, m.height)), "\n")
 	case screenAnnotList:
 		return strings.Join(paintDim(m.annot.Render(m.width, m.height)), "\n")
 	case screenAnnotate:
@@ -405,6 +436,29 @@ func (m *Model) readerStyle() string {
 		return m.reader.Prefs().Style
 	}
 	return m.lib.Global.Style
+}
+
+// recordActivity accumulates reading time, attributing the gap since the last
+// reading action (capped at 5 minutes so walking away is not counted) and
+// rolling the daily streak.
+func (m *Model) recordActivity() {
+	now := time.Now()
+	secs := 0
+	if !m.lastActivity.IsZero() {
+		if d := now.Sub(m.lastActivity); d > 0 && d <= 5*time.Minute {
+			secs = int(d.Seconds())
+		}
+	}
+	store.RecordActivity(m.lib, now, secs)
+	m.lastActivity = now
+}
+
+// openBookForTest seeds TotalChars from the in-memory book without a real file
+// (used by tests; mirrors the TotalChars seeding that openBook does).
+func (m *Model) openBookForTest() {
+	if e := m.lib.FindByID(m.bookID); e != nil && m.book != nil && e.TotalChars == 0 {
+		e.TotalChars = book.TotalChars(m.book)
+	}
 }
 
 // helpText returns the keybinding help, disguised as a CLI --help dump.

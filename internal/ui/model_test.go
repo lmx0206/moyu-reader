@@ -178,3 +178,37 @@ func TestModelAnnotationListJumpAndDelete(t *testing.T) {
 		t.Fatalf("d should delete annotation: %+v", e)
 	}
 }
+
+func TestModelCOpensStatsFromReader(t *testing.T) {
+	m := newReaderModel(t)
+	m.lib.Books = append(m.lib.Books, store.BookEntry{ID: "x"})
+	nm, _ := m.Update(keyRunes("c"))
+	m = nm.(*Model)
+	if m.screen != screenStats {
+		t.Fatalf("c should open stats, got %v", m.screen)
+	}
+	if !contains(m.View(), "Cover") {
+		t.Fatalf("stats view should show coverage report:\n%s", m.View())
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = nm.(*Model)
+	if m.screen != screenReader {
+		t.Fatalf("esc should return to reader, got %v", m.screen)
+	}
+}
+
+func TestModelRecordsCharsReadOnPageDown(t *testing.T) {
+	m := newReaderModel(t)                              // sampleBook, bookID "x"
+	m.book = sampleBook()                               // ensure book set
+	m.lib.Books = append(m.lib.Books, store.BookEntry{ID: "x"})
+	m.openBookForTest()                                 // sets TotalChars
+	nm, _ := m.Update(keyRunes("f"))                    // page down -> saveProgress
+	m = nm.(*Model)
+	e := m.lib.FindByID("x")
+	if e.TotalChars == 0 {
+		t.Fatalf("TotalChars should be set on open")
+	}
+	if e.CharsRead <= 0 || e.FurthestPara == 0 {
+		t.Fatalf("paging down should advance high-water: %+v", e)
+	}
+}
