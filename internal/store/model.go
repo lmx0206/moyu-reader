@@ -32,10 +32,14 @@ type BookEntry struct {
 	File         string       `json:"file"` // relative to data dir, e.g. "books/<id>.epub"
 	AddedAt      string       `json:"addedAt"`
 	LastOpenedAt string       `json:"lastOpenedAt"`
-	Progress     Progress     `json:"progress"`
-	Prefs        Prefs        `json:"prefs"`
-	Annotations  []Annotation `json:"annotations,omitempty"`
-	Broken       bool         `json:"broken,omitempty"`
+	Progress        Progress     `json:"progress"`
+	Prefs           Prefs        `json:"prefs"`
+	Annotations     []Annotation `json:"annotations,omitempty"`
+	TotalChars      int          `json:"totalChars,omitempty"`
+	CharsRead       int          `json:"charsRead,omitempty"`
+	FurthestChapter int          `json:"furthestChapter,omitempty"`
+	FurthestPara    int          `json:"furthestPara,omitempty"`
+	Broken          bool         `json:"broken,omitempty"`
 }
 
 // Library is the whole bookshelf plus global defaults.
@@ -43,6 +47,7 @@ type Library struct {
 	LastBookID string      `json:"lastBookId"`
 	Global     Prefs       `json:"global"`
 	Books      []BookEntry `json:"books"`
+	Stats      Stats       `json:"stats,omitempty"`
 }
 
 // NewLibrary returns an empty library with sane default prefs.

@@ -178,3 +178,84 @@ func TestModelAnnotationListJumpAndDelete(t *testing.T) {
 		t.Fatalf("d should delete annotation: %+v", e)
 	}
 }
+
+func TestModelCOpensStatsFromReader(t *testing.T) {
+	m := newReaderModel(t)
+	m.lib.Books = append(m.lib.Books, store.BookEntry{ID: "x"})
+	nm, _ := m.Update(keyRunes("c"))
+	m = nm.(*Model)
+	if m.screen != screenStats {
+		t.Fatalf("c should open stats, got %v", m.screen)
+	}
+	if !contains(m.View(), "Cover") {
+		t.Fatalf("stats view should show coverage report:\n%s", m.View())
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = nm.(*Model)
+	if m.screen != screenReader {
+		t.Fatalf("esc should return to reader, got %v", m.screen)
+	}
+}
+
+func TestModelRecordsCharsReadOnPageDown(t *testing.T) {
+	m := newReaderModel(t)                              // sampleBook, bookID "x"
+	m.book = sampleBook()                               // ensure book set
+	m.lib.Books = append(m.lib.Books, store.BookEntry{ID: "x"})
+	m.openBookForTest()                                 // sets TotalChars
+	nm, _ := m.Update(keyRunes("f"))                    // page down -> saveProgress
+	m = nm.(*Model)
+	e := m.lib.FindByID("x")
+	if e.TotalChars == 0 {
+		t.Fatalf("TotalChars should be set on open")
+	}
+	if e.CharsRead <= 0 || e.FurthestPara == 0 {
+		t.Fatalf("paging down should advance high-water: %+v", e)
+	}
+}
+
+func TestModelMCyclesIntoRepl(t *testing.T) {
+	m := newReaderModel(t) // starts shell
+	nm, _ := m.Update(keyRunes("m"))
+	m = nm.(*Model)
+	if m.reader.Prefs().Mode != "inline" || m.repl != nil {
+		t.Fatalf("first m should go shell->inline, got mode=%q repl=%v", m.reader.Prefs().Mode, m.repl)
+	}
+	nm, _ = m.Update(keyRunes("m"))
+	m = nm.(*Model)
+	if m.repl == nil {
+		t.Fatalf("second m should enter repl")
+	}
+	// typing inside repl feeds the buffer, not the page
+	nm, _ = m.Update(keyRunes("toc"))
+	m = nm.(*Model)
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(*Model)
+	if !contains(m.View(), "第二章") {
+		t.Fatalf("repl 'toc' should list chapters:\n%s", m.View())
+	}
+	// m again leaves repl back to shell reading
+	nm, _ = m.Update(keyRunes("m"))
+	m = nm.(*Model)
+	if m.repl != nil || m.reader.Prefs().Mode != "shell" {
+		t.Fatalf("m in repl should return to shell, repl=%v mode=%q", m.repl, m.reader.Prefs().Mode)
+	}
+}
+
+func TestModelReplBossAndEsc(t *testing.T) {
+	m := newReaderModel(t)
+	m.repl = NewReplView(m.book, store.Progress{}, store.Prefs{Style: "log"}, 40, 12)
+	// backtick still triggers boss even in repl
+	nm, _ := m.Update(keyRunes("`"))
+	m = nm.(*Model)
+	if !m.bossActive {
+		t.Fatalf("backtick should trigger boss in repl")
+	}
+	nm, _ = m.Update(keyRunes("`"))
+	m = nm.(*Model)
+	// esc in repl returns to shelf
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = nm.(*Model)
+	if m.screen != screenShelf || m.repl != nil {
+		t.Fatalf("esc in repl should go to shelf, screen=%v repl=%v", m.screen, m.repl)
+	}
+}

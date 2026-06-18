@@ -23,6 +23,7 @@ const (
 	screenHelp
 	screenAnnotate
 	screenAnnotList
+	screenStats
 )
 
 // bossTickMsg drives the boss-screen auto-scroll.
@@ -42,19 +43,22 @@ type Model struct {
 
 	shelf  *ShelfView
 	reader *ReaderView
+	repl   *ReplView
 	book   *book.Book
 	bookID string
 
-	toc        *TOCView
-	annot      *AnnotationView
-	helpReturn screen
+	toc         *TOCView
+	annot       *AnnotationView
+	helpReturn  screen
+	statsReturn screen
 
 	bossActive bool
 	bossTick   int
 
-	importBuf string // typed path in import screen
-	annotBuf  string // typed note in annotate screen
-	status    string // transient status line (errors etc.)
+	importBuf    string    // typed path in import screen
+	annotBuf     string    // typed note in annotate screen
+	status       string    // transient status line (errors etc.)
+	lastActivity time.Time // for accumulating reading time
 }
 
 // NewModel builds the root model. If openID is non-empty, it opens that book
@@ -90,18 +94,27 @@ func (m *Model) openBook(id string) {
 		m.status = "这本书打不开（已标记损坏）"
 		return
 	}
+	if e.TotalChars == 0 {
+		e.TotalChars = book.TotalChars(bk)
+	}
 	m.reader = NewReaderView(bk, e.Progress, e.Prefs, m.width, m.height)
 	m.book = bk
 	m.bookID = id
+	m.lastActivity = time.Time{}
 	m.screen = screenReader
 }
 
-// saveProgress persists the current reader position + prefs.
+// saveProgress persists the current reader position + prefs and advances the
+// per-book reading high-water mark.
 func (m *Model) saveProgress() {
 	if m.reader == nil || m.bookID == "" {
 		return
 	}
-	store.UpdateProgress(m.lib, m.bookID, m.reader.Progress(), m.reader.Prefs())
+	p := m.reader.Progress()
+	store.UpdateProgress(m.lib, m.bookID, p, m.reader.Prefs())
+	if m.book != nil {
+		store.RecordReading(m.lib, m.bookID, p.Chapter, p.Para, book.CharsUpTo(m.book, p.Chapter, p.Para))
+	}
 	_ = m.st.Save(m.lib)
 }
 
@@ -111,6 +124,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		if m.reader != nil {
 			m.reader.SetSize(msg.Width, msg.Height)
+		}
+		if m.repl != nil {
+			m.repl.SetSize(msg.Width, msg.Height)
 		}
 		return m, nil
 
@@ -151,6 +167,13 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleAnnotateKey(msg)
 	case screenAnnotList:
 		return m.handleAnnotListKey(key)
+	case screenStats:
+		return m.handleStatsKey(key)
+	}
+
+	// REPL captures typed input, so route it before the generic ?/boss/b checks.
+	if m.screen == screenReader && m.repl != nil {
+		return m.handleReplKey(msg)
 	}
 
 	// Help is available from shelf and reader.
@@ -248,6 +271,14 @@ func (m *Model) handleAnnotListKey(key string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) handleStatsKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "esc", "q", "c":
+		m.screen = m.statsReturn
+	}
+	return m, nil
+}
+
 func (m *Model) handleShelfKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "q", "ctrl+c":
@@ -266,6 +297,9 @@ func (m *Model) handleShelfKey(key string) (tea.Model, tea.Cmd) {
 		m.status = ""
 	case "d":
 		m.deleteSelected()
+	case "c":
+		m.statsReturn = screenShelf
+		m.screen = screenStats
 	}
 	return m, nil
 }
@@ -288,7 +322,11 @@ func (m *Model) deleteSelected() {
 }
 
 func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
+	m.recordActivity()
 	switch key {
+	case "c":
+		m.statsReturn = screenReader
+		m.screen = screenStats
 	case "q", "esc":
 		m.saveProgress()
 		m.screen = screenShelf
@@ -309,7 +347,7 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.reader.CycleStyle()
 	case "m":
-		m.reader.ToggleMode()
+		m.cycleMode()
 	case "s":
 		m.reader.ToggleNav()
 	case "a":
@@ -327,6 +365,83 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// cycleMode advances the reading presentation shell -> inline -> repl. (The
+// repl -> shell leg is handled inside handleReplKey, since the 'm' key is
+// intercepted there while the REPL is active.)
+func (m *Model) cycleMode() {
+	if m.book == nil {
+		m.reader.ToggleMode()
+		return
+	}
+	if m.reader.Prefs().Mode == "inline" {
+		m.repl = NewReplView(m.book, m.reader.Progress(), m.reader.Prefs(), m.width, m.height)
+		return
+	}
+	m.reader.ToggleMode() // shell -> inline
+}
+
+func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.recordActivity()
+	switch msg.String() {
+	case "`":
+		m.bossActive = true
+		m.bossTick = 0
+		return m, bossTick()
+	case "m":
+		// leave repl, resume shell-mode reading at the same paragraph
+		p := m.repl.Progress()
+		m.reader.JumpToPara(p.Chapter, p.Para)
+		if m.reader.Prefs().Mode != "shell" {
+			m.reader.ToggleMode() // inline -> shell
+		}
+		m.repl = nil
+		m.saveProgress()
+	case "esc":
+		m.replExitToShelf()
+	case "ctrl+c":
+		m.replSyncProgress()
+		m.saveProgress()
+		return m, tea.Quit
+	case "enter":
+		m.repl.Submit()
+		m.replSyncProgress()
+		m.saveProgress()
+		if m.repl.quit {
+			m.replExitToShelf()
+		}
+	case "backspace":
+		m.repl.Backspace()
+	case "up":
+		m.repl.HistoryPrev()
+	case "down":
+		m.repl.HistoryNext()
+	default:
+		if msg.Type == tea.KeyRunes {
+			m.repl.Insert(string(msg.Runes))
+		} else if msg.Type == tea.KeySpace {
+			m.repl.Insert(" ")
+		}
+	}
+	return m, nil
+}
+
+// replSyncProgress copies the repl position into the reader so saveProgress and
+// later modes see the latest position.
+func (m *Model) replSyncProgress() {
+	if m.repl != nil && m.reader != nil {
+		p := m.repl.Progress()
+		m.reader.JumpToPara(p.Chapter, p.Para)
+	}
+}
+
+func (m *Model) replExitToShelf() {
+	m.replSyncProgress()
+	m.saveProgress()
+	m.repl = nil
+	m.screen = screenShelf
+	m.shelf = NewShelfView(m.lib)
 }
 
 func (m *Model) handleImportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -376,6 +491,9 @@ func (m *Model) View() string {
 	}
 	switch m.screen {
 	case screenReader:
+		if m.repl != nil {
+			return strings.Join(paintDim(m.repl.Render()), "\n")
+		}
 		lines := m.reader.Render()
 		if m.reader.Prefs().Mode == "shell" {
 			return strings.Join(paintShell(lines), "\n")
@@ -387,6 +505,8 @@ func (m *Model) View() string {
 		return strings.Join(paintDim(helpText()), "\n")
 	case screenImport:
 		return "导入 EPUB（粘贴 .epub 完整路径后回车，Esc 取消）:\n\n> " + m.importBuf + "\n\n" + m.status
+	case screenStats:
+		return strings.Join(paintDim((StatsView{}).Render(m.lib, m.width, m.height)), "\n")
 	case screenAnnotList:
 		return strings.Join(paintDim(m.annot.Render(m.width, m.height)), "\n")
 	case screenAnnotate:
@@ -405,6 +525,29 @@ func (m *Model) readerStyle() string {
 		return m.reader.Prefs().Style
 	}
 	return m.lib.Global.Style
+}
+
+// recordActivity accumulates reading time, attributing the gap since the last
+// reading action (capped at 5 minutes so walking away is not counted) and
+// rolling the daily streak.
+func (m *Model) recordActivity() {
+	now := time.Now()
+	secs := 0
+	if !m.lastActivity.IsZero() {
+		if d := now.Sub(m.lastActivity); d > 0 && d <= 5*time.Minute {
+			secs = int(d.Seconds())
+		}
+	}
+	store.RecordActivity(m.lib, now, secs)
+	m.lastActivity = now
+}
+
+// openBookForTest seeds TotalChars from the in-memory book without a real file
+// (used by tests; mirrors the TotalChars seeding that openBook does).
+func (m *Model) openBookForTest() {
+	if e := m.lib.FindByID(m.bookID); e != nil && m.book != nil && e.TotalChars == 0 {
+		e.TotalChars = book.TotalChars(m.book)
+	}
 }
 
 // helpText returns the keybinding help, disguised as a CLI --help dump.
