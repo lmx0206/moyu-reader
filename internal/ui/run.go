@@ -10,7 +10,7 @@ import (
 // directly; otherwise it starts on the shelf.
 func Run(st *store.Store, lib *store.Library, openID string) error {
 	m := NewModel(st, lib, openID)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
 }

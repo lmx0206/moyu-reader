@@ -198,3 +198,63 @@ func TestReplResumePositionClamp(t *testing.T) {
 		t.Fatalf("Progress().Chapter should be 1, got %d", got)
 	}
 }
+
+// scrollBook has enough short paragraphs that the rendered scrollback overflows
+// a small window, so scrolling can be exercised.
+func scrollBook() *book.Book {
+	return &book.Book{Title: "S", Chapters: []book.Chapter{
+		{Title: "c", Paragraphs: []string{"一", "二", "三", "四", "五", "六"}},
+	}}
+}
+
+func TestReplScrollbackUpDown(t *testing.T) {
+	rv := NewReplView(scrollBook(), store.Progress{}, store.Prefs{Style: "log"}, 60, 5) // bodyH=4
+	for i := 0; i < 6; i++ {
+		rv.input = "next"
+		rv.Submit()
+	}
+	bottom := strings.Join(rv.Render(), "\n")
+
+	rv.ScrollUp(3)
+	up := strings.Join(rv.Render(), "\n")
+	if up == bottom {
+		t.Fatalf("ScrollUp should change the visible window:\n%s", up)
+	}
+	if len(rv.Render()) != 5 {
+		t.Fatalf("Render must stay height(5) while scrolled, got %d", len(rv.Render()))
+	}
+
+	rv.ScrollDown(100) // clamp back to bottom
+	if got := strings.Join(rv.Render(), "\n"); got != bottom {
+		t.Fatalf("ScrollDown past bottom should match original bottom view:\nwant:\n%s\ngot:\n%s", bottom, got)
+	}
+}
+
+func TestReplSubmitSnapsToBottom(t *testing.T) {
+	rv := NewReplView(scrollBook(), store.Progress{}, store.Prefs{Style: "log"}, 60, 5)
+	for i := 0; i < 6; i++ {
+		rv.input = "next"
+		rv.Submit()
+	}
+	bottom := strings.Join(rv.Render(), "\n")
+	rv.ScrollUp(3)
+	if strings.Join(rv.Render(), "\n") == bottom {
+		t.Fatalf("precondition: ScrollUp should move away from bottom")
+	}
+	rv.input = "status"
+	rv.Submit() // any command output should snap the view back to the bottom
+	if rv.scrollOff != 0 {
+		t.Fatalf("Submit should reset scrollOff to 0, got %d", rv.scrollOff)
+	}
+}
+
+func TestReplScrollUpClampsToContent(t *testing.T) {
+	// few lines (well under the window) -> nothing to scroll
+	rv := NewReplView(scrollBook(), store.Progress{}, store.Prefs{Style: "log"}, 60, 20)
+	rv.input = "next"
+	rv.Submit()
+	rv.ScrollUp(50)
+	if rv.scrollOff != 0 {
+		t.Fatalf("ScrollUp with no overflow should stay at 0, got %d", rv.scrollOff)
+	}
+}

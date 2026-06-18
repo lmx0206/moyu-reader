@@ -25,6 +25,7 @@ type ReplView struct {
 	history       []string
 	histPos       int // browse index into history; == len(history) when not browsing
 	seed          int // running seed so inline prefixes vary across the session
+	scrollOff     int // lines scrolled up from the bottom (0 = following newest)
 	quit          bool
 }
 
@@ -53,6 +54,39 @@ func (rv *ReplView) paras() []string {
 // SetSize updates terminal dimensions. Scrollback is historical text and is
 // kept as-is; only the visible window changes.
 func (rv *ReplView) SetSize(width, height int) { rv.width, rv.height = width, height }
+
+// bodyHeight is the number of scrollback lines visible above the prompt.
+func (rv *ReplView) bodyHeight() int {
+	if rv.height < 1 {
+		return 0
+	}
+	return rv.height - 1
+}
+
+// maxScroll is how far up the scrollback can be scrolled (0 when it fits).
+func (rv *ReplView) maxScroll() int {
+	m := len(rv.scroll) - rv.bodyHeight()
+	if m < 0 {
+		return 0
+	}
+	return m
+}
+
+// ScrollUp moves the view n lines toward older output (clamped).
+func (rv *ReplView) ScrollUp(n int) {
+	rv.scrollOff += n
+	if max := rv.maxScroll(); rv.scrollOff > max {
+		rv.scrollOff = max
+	}
+}
+
+// ScrollDown moves the view n lines toward the newest output (clamped at the bottom).
+func (rv *ReplView) ScrollDown(n int) {
+	rv.scrollOff -= n
+	if rv.scrollOff < 0 {
+		rv.scrollOff = 0
+	}
+}
 
 // Progress returns the next-to-read position (last emitted + 1).
 func (rv *ReplView) Progress() store.Progress {
@@ -104,6 +138,7 @@ func (rv *ReplView) Submit() {
 	rv.histPos = len(rv.history)
 	rv.run(strings.TrimSpace(cmd))
 	rv.input = ""
+	rv.scrollOff = 0 // new output: snap the view back to the bottom
 }
 
 func (rv *ReplView) echo(line string) { rv.scroll = append(rv.scroll, line) }
@@ -234,18 +269,26 @@ func (rv *ReplView) help() {
 	}
 }
 
-// Render returns exactly height lines: the tail of the scrollback bottom-aligned
-// above a final prompt line.
+// Render returns exactly height lines: a scrollback window above a final prompt
+// line. scrollOff shifts the window up toward older output; at offset 0 it shows
+// the newest lines (bottom-aligned).
 func (rv *ReplView) Render() []string {
-	bodyH := rv.height - 1
-	if bodyH < 0 {
-		bodyH = 0
+	bodyH := rv.bodyHeight()
+	if rv.scrollOff > rv.maxScroll() { // clamp in case scrollback shrank
+		rv.scrollOff = rv.maxScroll()
 	}
-	start := 0
-	if len(rv.scroll) > bodyH {
-		start = len(rv.scroll) - bodyH
+	start := len(rv.scroll) - bodyH - rv.scrollOff
+	if start < 0 {
+		start = 0
 	}
-	visible := rv.scroll[start:]
+	end := start + bodyH
+	if end > len(rv.scroll) {
+		end = len(rv.scroll)
+	}
+	var visible []string
+	if start < end {
+		visible = rv.scroll[start:end]
+	}
 
 	out := make([]string, 0, rv.height)
 	for i := 0; i < bodyH-len(visible); i++ {
