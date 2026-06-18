@@ -11,6 +11,8 @@
   - 阅读模式 B（内联）：每行正文伪装成带真实时间戳的日志行
   - 老板键：满屏自动滚动的假日志，**只有老板键本身能退出**（可随便敲键装忙）
 - 🎭 **六种伪装风格**：`log` / `build` / `git` / `docker` / `npm` / `pytest`，`Tab` 循环切换
+- 🔖 **书签 / 笔记**：`a` 在当前位置加书签（笔记可留空）或写批注，`l` 打开标注列表（伪装成调试器「断点面板」`breakpoints (N)`），回车跳转、`d` 删除
+- 🪟 **窗口自适应**：改变终端大小后正文按**段落**自动重排，内容不丢失、不被截断；书签也按段落锚定，换宽度依旧准
 - 🧭 **翻页 / 滚动双模式**：`s` 切换；滚动模式右侧带滚动条
 - 📑 **目录跳转**：`g` 弹出「代码大纲」样式章节列表，回车跳章
 - ❓ **帮助键**：`?` 弹出伪装成 `--help` 的快捷键说明
@@ -19,14 +21,18 @@
 ## 安装
 
 ### 方式一：直接下载（推荐）
-到 [Releases](https://github.com/lmx0206/moyu-reader/releases) 下载最新 `reader.exe`，双击即用。
+到 [Releases](https://github.com/lmx0206/moyu-reader/releases) 下载最新的 `moyu-reader_vX.X.X.exe`，双击即用。
 
 ### 方式二：自行编译
 需要 Go 1.26+：
 ```
+# 普通编译（版本号显示为 dev）
 go build -ldflags "-s -w" -o reader.exe ./cmd/reader
+
+# 带版本号编译（与发布产物一致）
+go build -ldflags "-s -w -X moyureader/internal/version.Version=0.5.1" -o moyu-reader_v0.5.1.exe ./cmd/reader
 ```
-产物是单文件 `reader.exe`。数据（书架 + 进度 + 导入的 epub）存在 exe 同级的 `data/` 文件夹，可用环境变量 `MOYU_DATA` 改到别处。
+产物是单文件 exe。数据（书架 + 进度 + 标注 + 导入的书）存在 exe 同级的 `data/` 文件夹，可用环境变量 `MOYU_DATA` 改到别处。版本号会嵌入二进制，`reader.exe version` 可查看。
 
 > 小贴士：可把 exe 改名成 `tail.exe` / `gradlew.exe`，进程列表里更不显眼。
 
@@ -38,6 +44,7 @@ reader.exe 某本书.epub|.txt      导入并直接阅读
 reader.exe import 路径.epub|.txt  仅导入到书架
 reader.exe list                 列出书架
 reader.exe stream [id]          内联流式模式（在集成终端里像一条吐日志的命令）
+reader.exe version              打印版本号（也支持 --version / -v）
 ```
 
 ## 快捷键
@@ -62,6 +69,8 @@ reader.exe stream [id]          内联流式模式（在集成终端里像一条
 | `Tab` | 切伪装风格（log/build/git/docker/npm/pytest） |
 | `m` | 切阅读模式（外壳 / 内联） |
 | `g` | 目录跳转 |
+| `a` | 加书签 / 笔记 |
+| `l` | 标注列表（回车跳转，`d` 删除） |
 | `` ` `` 或 `b` | 老板键（再按一次返回） |
 | `?` | 帮助 |
 | `Esc` | 回书架 |
@@ -74,12 +83,22 @@ reader.exe stream [id]          内联流式模式（在集成终端里像一条
 | `t` | 切风格 |
 | `q` | 退出 |
 
+## 功能路线图
+
+- [x] **v0.2** 阅读界面（日志查看器外观）+ 目录跳转 `g` + 帮助 `?` + CI / Release 工作流
+- [x] **v0.3** 翻页 / 滚动双导航 + 滚动条 + 章节页码 + 真实时间戳
+- [x] **v0.4** TXT 阅读（自动识别 UTF-8 / GBK、按章分割）+ 三种新伪装风格（docker / npm / pytest）
+- [x] **v0.5** 书签 + 笔记（标注）+ 段落锚点定位（修复窗口缩放内容丢失）
+- [x] **v0.5.1** 修复内联模式缩放后正文被截断
+- [ ] **v0.6** 假命令行（在终端里假装执行命令）+ 摸鱼统计（阅读时长 / 字数 / 进度）
+- [ ] 后续设想：标注导出、更多电子书格式、跨设备同步
+
 ## 发布新版本
 
-打一个 `v*` tag 并推送，GitHub Actions 会自动交叉编译 `reader.exe` 并发到 Releases：
+每次发版前请先**更新本 README**（特性 / 快捷键 / 路线图打钩），保持文档与实现一致。然后打一个 `v*` tag 并推送，GitHub Actions 会自动交叉编译并把版本号嵌入二进制，产物命名为 `moyu-reader_v<版本>.exe` 发到 Releases：
 ```
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.6.0
+git push origin v0.6.0
 ```
 
 ## 开发

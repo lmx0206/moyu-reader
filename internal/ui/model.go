@@ -10,6 +10,7 @@ import (
 	"moyureader/internal/book"
 	"moyureader/internal/disguise"
 	"moyureader/internal/store"
+	"moyureader/internal/version"
 )
 
 type screen int
@@ -409,7 +410,7 @@ func (m *Model) readerStyle() string {
 // helpText returns the keybinding help, disguised as a CLI --help dump.
 func helpText() []string {
 	return []string{
-		"reader - a tail-style log viewer (v0.2)",
+		"reader - a tail-style log viewer (v" + version.Version + ")",
 		"",
 		"USAGE:",
 		"  reader [command]",
