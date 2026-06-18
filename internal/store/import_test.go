@@ -34,9 +34,9 @@ func TestImportCopiesFileAndAddsEntry(t *testing.T) {
 func TestUpdateProgress(t *testing.T) {
 	lib := NewLibrary()
 	lib.Books = append(lib.Books, BookEntry{ID: "a"})
-	UpdateProgress(lib, "a", Progress{Chapter: 2, Line: 40}, Prefs{Style: "git", Mode: "inline"})
+	UpdateProgress(lib, "a", Progress{Chapter: 2, Para: 40}, Prefs{Style: "git", Mode: "inline"})
 	e := lib.FindByID("a")
-	if e.Progress.Chapter != 2 || e.Progress.Line != 40 {
+	if e.Progress.Chapter != 2 || e.Progress.Para != 40 {
 		t.Fatalf("progress not updated: %+v", e.Progress)
 	}
 	if e.Prefs.Style != "git" || lib.LastBookID != "a" {

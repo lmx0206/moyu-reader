@@ -29,7 +29,7 @@ func TestStreamerNextAdvances(t *testing.T) {
 	p1 := s.Progress()
 	_ = s.Next()
 	p2 := s.Progress()
-	if p2.Line <= p1.Line && p2.Chapter == p1.Chapter {
+	if p2.Para <= p1.Para && p2.Chapter == p1.Chapter {
 		t.Fatalf("position should advance: %+v -> %+v", p1, p2)
 	}
 	// inline 行应带日志前缀
