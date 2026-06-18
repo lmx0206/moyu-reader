@@ -39,7 +39,7 @@ func NewReplView(b *book.Book, p store.Progress, prefs store.Prefs, width, heigh
 	}
 	rv.chapter = clamp(p.Chapter, 0, len(b.Chapters)-1)
 	rv.para = clamp(p.Para, 0, len(rv.paras())) - 1 // last emitted = (next-to-read) - 1
-	rv.histPos = 0
+	rv.histPos = len(rv.history)                     // not browsing: cursor past end of (empty) history
 	return rv
 }
 

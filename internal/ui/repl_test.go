@@ -126,3 +126,75 @@ func TestReplHistory(t *testing.T) {
 		t.Fatalf("history next = %q, want status", rv.input)
 	}
 }
+
+// TestReplPrevInChapter verifies that after two next submits, a prev moves
+// back one paragraph (Progress().Para decrements by one).
+func TestReplPrevInChapter(t *testing.T) {
+	rv := newRepl()
+	rv.input = "next"
+	rv.Submit() // emits 甲甲甲, para=0, Progress.Para=1
+	rv.input = "next"
+	rv.Submit() // emits 乙乙乙, para=1, Progress.Para=2
+	rv.input = "prev"
+	rv.Submit() // re-emits 甲甲甲, para=0, Progress.Para=1
+	joined := strings.Join(rv.Render(), "\n")
+	if !strings.Contains(joined, "甲甲甲") {
+		t.Fatalf("prev should re-emit previous paragraph:\n%s", joined)
+	}
+	if got := rv.Progress().Para; got != 1 {
+		t.Fatalf("prev should leave Progress.Para=1, got %d", got)
+	}
+}
+
+// TestReplPrevAtBOF verifies that prev at the very start emits "-- BOF --".
+func TestReplPrevAtBOF(t *testing.T) {
+	rv := newRepl()
+	rv.input = "prev"
+	rv.Submit()
+	joined := strings.Join(rv.Render(), "\n")
+	if !strings.Contains(joined, "-- BOF --") {
+		t.Fatalf("prev at beginning-of-book should print -- BOF --:\n%s", joined)
+	}
+}
+
+// TestReplGitLogAlias verifies that "git log" advances like next.
+func TestReplGitLogAlias(t *testing.T) {
+	rv := newRepl()
+	rv.input = "git log"
+	rv.Submit()
+	joined := strings.Join(rv.Render(), "\n")
+	if !strings.Contains(joined, "甲甲甲") {
+		t.Fatalf("git log should emit first paragraph:\n%s", joined)
+	}
+	if got := rv.Progress().Para; got != 1 {
+		t.Fatalf("git log should advance Progress.Para to 1, got %d", got)
+	}
+}
+
+// TestReplGitStatusAlias verifies that "git status" prints a progress line
+// containing "on chapter".
+func TestReplGitStatusAlias(t *testing.T) {
+	rv := newRepl()
+	rv.input = "git status"
+	rv.Submit()
+	joined := strings.Join(rv.Render(), "\n")
+	if !strings.Contains(joined, "on chapter") {
+		t.Fatalf("git status should print progress line with 'on chapter':\n%s", joined)
+	}
+}
+
+// TestReplResumePositionClamp verifies that a Progress pointing to para 0 of
+// chapter 1 (the last chapter in replBook) causes the next emit to show that
+// chapter's first paragraph ("丁丁丁") and leaves Progress().Chapter == 1.
+func TestReplResumePositionClamp(t *testing.T) {
+	rv := NewReplView(replBook(), store.Progress{Chapter: 1, Para: 0}, store.Prefs{Style: "log"}, 60, 10)
+	rv.input = "next"
+	rv.Submit()
+	joined := strings.Join(rv.Render(), "\n")
+	if !strings.Contains(joined, "丁丁丁") {
+		t.Fatalf("resume at chapter 1 para 0 should emit '丁丁丁':\n%s", joined)
+	}
+	if got := rv.Progress().Chapter; got != 1 {
+		t.Fatalf("Progress().Chapter should be 1, got %d", got)
+	}
+}
