@@ -259,3 +259,42 @@ func TestModelReplBossAndEsc(t *testing.T) {
 		t.Fatalf("esc in repl should go to shelf, screen=%v repl=%v", m.screen, m.repl)
 	}
 }
+
+func TestModelReplPgUpScrolls(t *testing.T) {
+	m := newReaderModel(t)
+	m.height = 5
+	m.repl = NewReplView(m.book, store.Progress{}, store.Prefs{Style: "log"}, 60, 5)
+	for i := 0; i < 8; i++ { // generate scrollback past the window
+		m.repl.input = "next"
+		m.repl.Submit()
+	}
+	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	m = nm.(*Model)
+	if m.repl.scrollOff == 0 {
+		t.Fatalf("PgUp should scroll the repl up (scrollOff > 0)")
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	m = nm.(*Model)
+	if m.repl.scrollOff != 0 {
+		t.Fatalf("PgDown should scroll back to bottom, got %d", m.repl.scrollOff)
+	}
+}
+
+func TestModelReplMouseWheelScrolls(t *testing.T) {
+	m := newReaderModel(t)
+	m.repl = NewReplView(m.book, store.Progress{}, store.Prefs{Style: "log"}, 60, 5)
+	for i := 0; i < 8; i++ {
+		m.repl.input = "next"
+		m.repl.Submit()
+	}
+	nm, _ := m.Update(tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonWheelUp})
+	m = nm.(*Model)
+	if m.repl.scrollOff == 0 {
+		t.Fatalf("wheel up should scroll the repl up")
+	}
+	nm, _ = m.Update(tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonWheelDown})
+	m = nm.(*Model)
+	if m.repl.scrollOff != 0 {
+		t.Fatalf("wheel down should scroll back to bottom, got %d", m.repl.scrollOff)
+	}
+}

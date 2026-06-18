@@ -137,6 +137,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case tea.MouseMsg:
+		// Mouse wheel scrolls the REPL scrollback; ignored elsewhere.
+		if m.repl != nil && m.screen == screenReader && !m.bossActive {
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				m.repl.ScrollUp(3)
+			case tea.MouseButtonWheelDown:
+				m.repl.ScrollDown(3)
+			}
+		}
+		return m, nil
+
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
@@ -417,6 +429,10 @@ func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.repl.HistoryPrev()
 	case "down":
 		m.repl.HistoryNext()
+	case "pgup":
+		m.repl.ScrollUp(m.replScrollPage())
+	case "pgdown":
+		m.repl.ScrollDown(m.replScrollPage())
 	default:
 		if msg.Type == tea.KeyRunes {
 			m.repl.Insert(string(msg.Runes))
@@ -425,6 +441,15 @@ func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// replScrollPage is how many lines PgUp/PgDn scroll the REPL scrollback (about
+// one screenful, leaving the prompt and a line of overlap).
+func (m *Model) replScrollPage() int {
+	if p := m.height - 2; p > 1 {
+		return p
+	}
+	return 1
 }
 
 // replSyncProgress copies the repl position into the reader so saveProgress and
