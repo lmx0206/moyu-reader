@@ -211,9 +211,10 @@ func (m *Model) handleAnnotateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.annotBuf = m.annotBuf[:n-1]
 		}
 	default:
-		if msg.Type == tea.KeyRunes {
+		switch msg.Type {
+		case tea.KeyRunes:
 			m.annotBuf += string(msg.Runes)
-		} else if msg.Type == tea.KeySpace {
+		case tea.KeySpace:
 			m.annotBuf += " "
 		}
 	}
@@ -338,9 +339,10 @@ func (m *Model) handleImportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.importBuf = m.importBuf[:n-1]
 		}
 	default:
-		if msg.Type == tea.KeyRunes {
+		switch msg.Type {
+		case tea.KeyRunes:
 			m.importBuf += string(msg.Runes)
-		} else if msg.Type == tea.KeySpace {
+		case tea.KeySpace:
 			m.importBuf += " "
 		}
 	}

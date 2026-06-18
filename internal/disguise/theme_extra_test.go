@@ -45,8 +45,8 @@ func TestNewThemesHeaderFooter(t *testing.T) {
 		if !strings.Contains(f, "? help") || !strings.Contains(f, "STATUSMARK") {
 			t.Fatalf("%s footer should embed status + help: %q", name, f)
 		}
-		if th.LinePrefix(3) != th.LinePrefix(3) {
-			t.Fatalf("%s LinePrefix not deterministic", name)
+		if a, b := th.LinePrefix(3), th.LinePrefix(3); a != b {
+			t.Fatalf("%s LinePrefix not deterministic: %q vs %q", name, a, b)
 		}
 		if strings.Contains(th.BossLine(2), "STATUSMARK") {
 			t.Fatalf("%s BossLine must not contain status/novel", name)

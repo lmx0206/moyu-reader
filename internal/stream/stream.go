@@ -129,5 +129,8 @@ func Run(s *Streamer, in io.Reader, out io.Writer, onExit func(store.Progress, s
 			emit()
 		}
 	}
+	if err := sc.Err(); err != nil {
+		fmt.Fprintln(out, err)
+	}
 	onExit(s.Progress(), s.Style())
 }
