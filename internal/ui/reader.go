@@ -83,11 +83,15 @@ const BodyIndent = 3
 const rightMargin = 1
 
 // contentWidth is the wrap width for novel body. In shell mode it reserves the
-// left indent plus a right margin so text breathes.
+// left indent plus a right margin so text breathes; in inline mode it reserves
+// room for the per-line log/build/git prefix so the prefixed line fits the
+// terminal and the paragraph reflows instead of being clipped on the right.
 func (r *ReaderView) contentWidth() int {
 	w := r.width
 	if r.mode == "shell" {
 		w -= BodyIndent + rightMargin
+	} else {
+		w -= disguise.PrefixWidth(disguise.ThemeByName(r.style))
 	}
 	if w < 10 {
 		return 10

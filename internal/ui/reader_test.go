@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"moyureader/internal/book"
+	"moyureader/internal/disguise"
 	"moyureader/internal/store"
 )
 
@@ -181,5 +182,27 @@ func TestReaderJumpToPara(t *testing.T) {
 	r.JumpToPara(1, 2)
 	if r.Progress().Chapter != 1 || r.Progress().Para != 2 {
 		t.Fatalf("JumpToPara(1,2) -> %+v", r.Progress())
+	}
+}
+
+// In inline mode each body line gets a log-style prefix prepended, then the
+// whole line is clipped to the terminal width. If wrapping ignores the prefix
+// width, the tail of every paragraph line is silently dropped. The novel text
+// must instead wrap to leave room for the prefix, losing no characters.
+func TestReaderInlineWrapsLeavingRoomForPrefix(t *testing.T) {
+	const n = 120
+	para := strings.Repeat("字", n)
+	b := &book.Book{Title: "T", Chapters: []book.Chapter{{Title: "第一章", Paragraphs: []string{para}}}}
+	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "inline"}, 100, 40)
+	th := disguise.ThemeByName("log")
+	got := 0
+	for i, line := range r.Render() {
+		prefix := th.LinePrefix(i)
+		if strings.HasPrefix(line, prefix) {
+			got += strings.Count(line[len(prefix):], "字")
+		}
+	}
+	if got != n {
+		t.Fatalf("inline mode dropped novel content: kept %d of %d chars (prefix overflow truncation)", got, n)
 	}
 }
