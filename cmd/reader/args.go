@@ -7,7 +7,7 @@ import (
 
 // command is the parsed CLI intent.
 type command struct {
-	Mode string // tui | open | import | stream | list
+	Mode string // tui | open | import | stream | list | version
 	Arg  string
 }
 
@@ -17,6 +17,8 @@ func parseArgs(args []string) command {
 		return command{Mode: "tui"}
 	}
 	switch args[0] {
+	case "version", "--version", "-v":
+		return command{Mode: "version"}
 	case "list":
 		return command{Mode: "list"}
 	case "stream":

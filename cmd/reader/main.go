@@ -10,10 +10,16 @@ import (
 	"moyureader/internal/store"
 	"moyureader/internal/stream"
 	"moyureader/internal/ui"
+	"moyureader/internal/version"
 )
 
 func main() {
 	cmd := parseArgs(os.Args[1:])
+
+	if cmd.Mode == "version" {
+		fmt.Printf("moyu-reader v%s\n", version.Version)
+		return
+	}
 
 	exe, err := os.Executable()
 	if err != nil {

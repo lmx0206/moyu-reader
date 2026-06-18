@@ -16,6 +16,9 @@ func TestParseArgs(t *testing.T) {
 		{[]string{"stream"}, "stream", ""},
 		{[]string{"stream", "abc"}, "stream", "abc"},
 		{[]string{"import", "x.epub"}, "import", "x.epub"},
+		{[]string{"version"}, "version", ""},
+		{[]string{"--version"}, "version", ""},
+		{[]string{"-v"}, "version", ""},
 		{[]string{"book.epub"}, "open", "book.epub"},
 		{[]string{"C:\\x\\My Book.epub"}, "open", "C:\\x\\My Book.epub"},
 	}

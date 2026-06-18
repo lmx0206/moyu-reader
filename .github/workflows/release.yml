@@ -15,9 +15,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.x'
-      - name: Build reader.exe
-        run: GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o reader.exe ./cmd/reader
+      - name: Build moyu-reader_<tag>.exe
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"   # strip leading "v": v0.5.1 -> 0.5.1
+          GOOS=windows GOARCH=amd64 go build \
+            -ldflags "-s -w -X moyureader/internal/version.Version=${VERSION}" \
+            -o "moyu-reader_${GITHUB_REF_NAME}.exe" ./cmd/reader
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: reader.exe
+          files: moyu-reader_*.exe
