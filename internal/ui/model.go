@@ -43,6 +43,7 @@ type Model struct {
 
 	shelf  *ShelfView
 	reader *ReaderView
+	repl   *ReplView
 	book   *book.Book
 	bookID string
 
@@ -124,6 +125,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.reader != nil {
 			m.reader.SetSize(msg.Width, msg.Height)
 		}
+		if m.repl != nil {
+			m.repl.SetSize(msg.Width, msg.Height)
+		}
 		return m, nil
 
 	case bossTickMsg:
@@ -165,6 +169,11 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleAnnotListKey(key)
 	case screenStats:
 		return m.handleStatsKey(key)
+	}
+
+	// REPL captures typed input, so route it before the generic ?/boss/b checks.
+	if m.screen == screenReader && m.repl != nil {
+		return m.handleReplKey(msg)
 	}
 
 	// Help is available from shelf and reader.
@@ -338,7 +347,7 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.reader.CycleStyle()
 	case "m":
-		m.reader.ToggleMode()
+		m.cycleMode()
 	case "s":
 		m.reader.ToggleNav()
 	case "a":
@@ -356,6 +365,83 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// cycleMode advances the reading presentation shell -> inline -> repl. (The
+// repl -> shell leg is handled inside handleReplKey, since the 'm' key is
+// intercepted there while the REPL is active.)
+func (m *Model) cycleMode() {
+	if m.book == nil {
+		m.reader.ToggleMode()
+		return
+	}
+	if m.reader.Prefs().Mode == "inline" {
+		m.repl = NewReplView(m.book, m.reader.Progress(), m.reader.Prefs(), m.width, m.height)
+		return
+	}
+	m.reader.ToggleMode() // shell -> inline
+}
+
+func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.recordActivity()
+	switch msg.String() {
+	case "`":
+		m.bossActive = true
+		m.bossTick = 0
+		return m, bossTick()
+	case "m":
+		// leave repl, resume shell-mode reading at the same paragraph
+		p := m.repl.Progress()
+		m.reader.JumpToPara(p.Chapter, p.Para)
+		if m.reader.Prefs().Mode != "shell" {
+			m.reader.ToggleMode() // inline -> shell
+		}
+		m.repl = nil
+		m.saveProgress()
+	case "esc":
+		m.replExitToShelf()
+	case "ctrl+c":
+		m.replSyncProgress()
+		m.saveProgress()
+		return m, tea.Quit
+	case "enter":
+		m.repl.Submit()
+		m.replSyncProgress()
+		m.saveProgress()
+		if m.repl.quit {
+			m.replExitToShelf()
+		}
+	case "backspace":
+		m.repl.Backspace()
+	case "up":
+		m.repl.HistoryPrev()
+	case "down":
+		m.repl.HistoryNext()
+	default:
+		if msg.Type == tea.KeyRunes {
+			m.repl.Insert(string(msg.Runes))
+		} else if msg.Type == tea.KeySpace {
+			m.repl.Insert(" ")
+		}
+	}
+	return m, nil
+}
+
+// replSyncProgress copies the repl position into the reader so saveProgress and
+// later modes see the latest position.
+func (m *Model) replSyncProgress() {
+	if m.repl != nil && m.reader != nil {
+		p := m.repl.Progress()
+		m.reader.JumpToPara(p.Chapter, p.Para)
+	}
+}
+
+func (m *Model) replExitToShelf() {
+	m.replSyncProgress()
+	m.saveProgress()
+	m.repl = nil
+	m.screen = screenShelf
+	m.shelf = NewShelfView(m.lib)
 }
 
 func (m *Model) handleImportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -405,6 +491,9 @@ func (m *Model) View() string {
 	}
 	switch m.screen {
 	case screenReader:
+		if m.repl != nil {
+			return strings.Join(paintDim(m.repl.Render()), "\n")
+		}
 		lines := m.reader.Render()
 		if m.reader.Prefs().Mode == "shell" {
 			return strings.Join(paintShell(lines), "\n")
