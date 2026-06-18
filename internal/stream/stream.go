@@ -33,7 +33,7 @@ func NewStreamer(b *book.Book, p store.Progress, style string, height int) *Stre
 	if p.Chapter >= 0 && p.Chapter < len(b.Chapters) {
 		s.chapter = p.Chapter
 	}
-	s.line = p.Line
+	s.line = render.ParaStartLine(s.chapterParas(), wrapWidth, p.Para)
 	return s
 }
 
@@ -42,6 +42,13 @@ func orDefault(s, def string) string {
 		return def
 	}
 	return s
+}
+
+func (s *Streamer) chapterParas() []string {
+	if s.chapter < 0 || s.chapter >= len(s.book.Chapters) {
+		return nil
+	}
+	return s.book.Chapters[s.chapter].Paragraphs
 }
 
 func (s *Streamer) chapterLines() []string {
@@ -92,7 +99,7 @@ func (s *Streamer) CycleStyle() { s.style = disguise.NextStyle(s.style) }
 
 // Progress / Style expose current state for persistence.
 func (s *Streamer) Progress() store.Progress {
-	return store.Progress{Chapter: s.chapter, Line: s.line}
+	return store.Progress{Chapter: s.chapter, Para: render.LineToPara(s.chapterParas(), wrapWidth, s.line)}
 }
 func (s *Streamer) Style() string { return s.style }
 

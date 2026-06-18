@@ -8,10 +8,11 @@ type Prefs struct {
 	Mode  string `json:"mode"`
 }
 
-// Progress is a stable reading position: chapter index + display-line index.
+// Progress is a stable reading position: chapter index + paragraph index
+// (layout-independent, so it survives window-width changes).
 type Progress struct {
 	Chapter int `json:"chapter"`
-	Line    int `json:"line"`
+	Para    int `json:"para"`
 }
 
 // Annotation marks a reading position with an optional note. An empty Note is a

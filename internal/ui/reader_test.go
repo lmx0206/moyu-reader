@@ -74,7 +74,7 @@ func TestReaderJumpTo(t *testing.T) {
 	b := sampleBook()
 	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
 	r.JumpTo(1)
-	if r.Progress().Chapter != 1 || r.Progress().Line != 0 {
+	if r.Progress().Chapter != 1 || r.Progress().Para != 0 {
 		t.Fatalf("JumpTo(1) -> %+v want {1,0}", r.Progress())
 	}
 	r.JumpTo(99) // clamp
@@ -106,7 +106,7 @@ func TestReaderPageDownCrossesChapter(t *testing.T) {
 	b := sampleBook()
 	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "inline"}, 40, 6)
 	start := r.Progress()
-	if start.Chapter != 0 || start.Line != 0 {
+	if start.Chapter != 0 || start.Para != 0 {
 		t.Fatalf("bad start %+v", start)
 	}
 	// 反复 PageDown 必须最终进入第 2 章
@@ -143,9 +143,43 @@ func TestReaderToggleModeAndCycleStyle(t *testing.T) {
 func TestReaderProgressClampOnConstruct(t *testing.T) {
 	b := sampleBook()
 	// 越界进度应被夹紧，不 panic
-	r := NewReaderView(b, store.Progress{Chapter: 99, Line: 99}, store.Prefs{Style: "log", Mode: "shell"}, 40, 10)
+	r := NewReaderView(b, store.Progress{Chapter: 99, Para: 99}, store.Prefs{Style: "log", Mode: "shell"}, 40, 10)
 	if r.Progress().Chapter < 0 || r.Progress().Chapter >= len(b.Chapters) {
 		t.Fatalf("chapter not clamped: %+v", r.Progress())
 	}
 	_ = r.Render() // 不得 panic
+}
+
+func longParaBook() *book.Book {
+	long := strings.Repeat("文", 200) // ~400 cells, wraps differently per width
+	return &book.Book{
+		Title: "L",
+		Chapters: []book.Chapter{{Title: "第一章", Paragraphs: []string{
+			strings.Repeat("甲", 30), long, strings.Repeat("乙", 30), long,
+		}}},
+	}
+}
+
+func TestReaderResizePreservesParagraph(t *testing.T) {
+	b := longParaBook()
+	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
+	r.PageDown()
+	r.PageDown()
+	before := r.Progress().Para
+	r.SetSize(100, 12) // much wider -> fewer wrapped lines
+	if got := r.Progress().Para; got != before {
+		t.Fatalf("resize should preserve top paragraph: before=%d after=%d", before, got)
+	}
+	if len(r.Render()) != 12 {
+		t.Fatalf("render must stay full height after resize")
+	}
+}
+
+func TestReaderJumpToPara(t *testing.T) {
+	b := sampleBook()
+	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
+	r.JumpToPara(1, 2)
+	if r.Progress().Chapter != 1 || r.Progress().Para != 2 {
+		t.Fatalf("JumpToPara(1,2) -> %+v", r.Progress())
+	}
 }

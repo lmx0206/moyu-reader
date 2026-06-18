@@ -35,7 +35,7 @@ func NewReaderView(b *book.Book, p store.Progress, prefs store.Prefs, width, hei
 		height: height,
 	}
 	r.chapter = clamp(p.Chapter, 0, len(b.Chapters)-1)
-	r.line = clampLine(p.Line, r.chapterLineCount())
+	r.line = clampLine(render.ParaStartLine(r.paras(), r.contentWidth(), p.Para), r.chapterLineCount())
 	return r
 }
 
@@ -66,10 +66,13 @@ func clampLine(v, count int) int {
 	return clamp(v, 0, count-1)
 }
 
-// SetSize updates terminal dimensions and re-clamps the line index.
+// SetSize updates terminal dimensions, re-anchoring to the paragraph currently
+// at the top so resizing the window keeps the reader in place (and never leaves
+// a half-empty page from a now-stale line index).
 func (r *ReaderView) SetSize(width, height int) {
+	topPara := render.LineToPara(r.paras(), r.contentWidth(), r.line) // at old width
 	r.width, r.height = width, height
-	r.line = clampLine(r.line, r.chapterLineCount())
+	r.line = clampLine(render.ParaStartLine(r.paras(), r.contentWidth(), topPara), r.chapterLineCount())
 }
 
 // BodyIndent is the left margin (spaces) applied to shell-mode body text.
@@ -118,9 +121,21 @@ func (r *ReaderView) bodyHeight() int {
 }
 
 // JumpTo moves to the start of the given chapter (clamped).
-func (r *ReaderView) JumpTo(chapter int) {
+func (r *ReaderView) JumpTo(chapter int) { r.JumpToPara(chapter, 0) }
+
+// JumpToPara moves to the start of the given paragraph in the given chapter
+// (both clamped).
+func (r *ReaderView) JumpToPara(chapter, para int) {
 	r.chapter = clamp(chapter, 0, len(r.book.Chapters)-1)
-	r.line = 0
+	r.line = clampLine(render.ParaStartLine(r.paras(), r.contentWidth(), para), r.chapterLineCount())
+}
+
+// paras returns the current chapter's paragraphs, or nil if out of range.
+func (r *ReaderView) paras() []string {
+	if r.chapter < 0 || r.chapter >= len(r.book.Chapters) {
+		return nil
+	}
+	return r.book.Chapters[r.chapter].Paragraphs
 }
 
 func (r *ReaderView) chapterLines() []string {
@@ -266,9 +281,9 @@ func (r *ReaderView) ToggleMode() {
 	}
 }
 
-// Progress returns the current stable position.
+// Progress returns the current stable position (top paragraph).
 func (r *ReaderView) Progress() store.Progress {
-	return store.Progress{Chapter: r.chapter, Line: r.line}
+	return store.Progress{Chapter: r.chapter, Para: render.LineToPara(r.paras(), r.contentWidth(), r.line)}
 }
 
 // Prefs returns current style/mode.
