@@ -37,10 +37,15 @@ func parseArgs(args []string) command {
 }
 
 // resolveDataDir picks the data directory: env override wins, else a "data"
-// folder next to the executable.
+// folder next to the executable. A relative override is made absolute so the
+// same MOYU_DATA value points at the same library regardless of the working
+// directory (double-click vs shell launch).
 func resolveDataDir(exePath, envOverride string) string {
-	if strings.TrimSpace(envOverride) != "" {
-		return envOverride
+	if e := strings.TrimSpace(envOverride); e != "" {
+		if abs, err := filepath.Abs(e); err == nil {
+			return abs
+		}
+		return e
 	}
 	return filepath.Join(filepath.Dir(exePath), "data")
 }

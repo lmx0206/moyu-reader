@@ -44,3 +44,13 @@ func TestResolveDataDirExeAdjacent(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }
+
+// A relative MOYU_DATA must be absolutized so the same value resolves to the
+// same library regardless of the process's working directory (double-click vs
+// shell launch).
+func TestResolveDataDirEnvAbsolutized(t *testing.T) {
+	got := resolveDataDir("D:\\app\\reader.exe", "rel/data")
+	if !filepath.IsAbs(got) {
+		t.Fatalf("relative env override should be absolutized, got %q", got)
+	}
+}

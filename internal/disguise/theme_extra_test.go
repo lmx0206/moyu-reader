@@ -53,3 +53,18 @@ func TestNewThemesHeaderFooter(t *testing.T) {
 		}
 	}
 }
+
+// The pytest theme's test numbers must not increment 0,1,2,… with the line
+// index (a clean ramp reads as fake). The number is the trailing token after
+// the last "test_"; consecutive seeds must not produce consecutive numbers.
+func TestPytestTestNumbersNotSequential(t *testing.T) {
+	th := pytestTheme{}
+	num := func(seed int) string {
+		p := th.LinePrefix(seed)
+		i := strings.LastIndex(p, "test_")
+		return strings.TrimSpace(p[i+len("test_"):])
+	}
+	if num(0) == "0" && num(1) == "1" && num(2) == "2" {
+		t.Fatalf("pytest numbers ramp sequentially: %s,%s,%s", num(0), num(1), num(2))
+	}
+}
