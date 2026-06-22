@@ -84,14 +84,14 @@ func (m *Model) Init() tea.Cmd { return nil }
 func (m *Model) openBook(id string) {
 	e := m.lib.FindByID(id)
 	if e == nil {
-		m.status = "找不到这本书"
+		m.status = "fatal: pathspec did not match any object"
 		return
 	}
 	bk, err := book.Open(filepath.Join(m.st.Dir(), filepath.FromSlash(e.File)))
 	if err != nil {
 		e.Broken = true
 		_ = m.st.Save(m.lib)
-		m.status = "这本书打不开（已标记损坏）"
+		m.status = "error: object file could not be read (marked stale)"
 		return
 	}
 	if e.TotalChars == 0 {
@@ -192,6 +192,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key == "?" {
 		m.helpReturn = m.screen
 		m.screen = screenHelp
+		m.pauseTiming()
 		return m, nil
 	}
 
@@ -199,6 +200,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if (key == "`" || key == "b") && m.screen == screenReader {
 		m.bossActive = true
 		m.bossTick = 0
+		m.pauseTiming()
 		return m, bossTick()
 	}
 
@@ -241,7 +243,7 @@ func (m *Model) handleAnnotateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		})
 		_ = m.st.Save(m.lib)
 		m.screen = screenReader
-		m.status = "已加标注"
+		m.status = "breakpoint set"
 	case "backspace":
 		if n := len(m.annotBuf); n > 0 {
 			m.annotBuf = m.annotBuf[:n-1]
@@ -339,8 +341,10 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 	case "c":
 		m.statsReturn = screenReader
 		m.screen = screenStats
+		m.pauseTiming()
 	case "q", "esc":
 		m.saveProgress()
+		m.pauseTiming()
 		m.screen = screenShelf
 		m.shelf = NewShelfView(m.lib)
 	case "ctrl+c":
@@ -359,21 +363,24 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.reader.CycleStyle()
 	case "m":
-		m.cycleMode()
+		return m, m.cycleMode()
 	case "s":
 		m.reader.ToggleNav()
 	case "a":
 		m.annotBuf = ""
 		m.screen = screenAnnotate
+		m.pauseTiming()
 	case "l":
 		if e := m.lib.FindByID(m.bookID); e != nil && m.book != nil {
 			m.annot = NewAnnotationView(m.book, e.Annotations)
 			m.screen = screenAnnotList
+			m.pauseTiming()
 		}
 	case "g":
 		if m.book != nil {
 			m.toc = NewTOCView(m.book, m.reader.Progress().Chapter)
 			m.screen = screenTOC
+			m.pauseTiming()
 		}
 	}
 	return m, nil
@@ -381,17 +388,19 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 
 // cycleMode advances the reading presentation shell -> inline -> repl. (The
 // repl -> shell leg is handled inside handleReplKey, since the 'm' key is
-// intercepted there while the REPL is active.)
-func (m *Model) cycleMode() {
+// intercepted there while the REPL is active.) Entering the REPL returns a
+// command enabling the mouse so the wheel can scroll the scrollback.
+func (m *Model) cycleMode() tea.Cmd {
 	if m.book == nil {
 		m.reader.ToggleMode()
-		return
+		return nil
 	}
 	if m.reader.Prefs().Mode == "inline" {
 		m.repl = NewReplView(m.book, m.reader.Progress(), m.reader.Prefs(), m.width, m.height)
-		return
+		return tea.EnableMouseCellMotion
 	}
 	m.reader.ToggleMode() // shell -> inline
+	return nil
 }
 
 func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -400,6 +409,7 @@ func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "`":
 		m.bossActive = true
 		m.bossTick = 0
+		m.pauseTiming()
 		return m, bossTick()
 	case "m":
 		// leave repl, resume shell-mode reading at the same paragraph
@@ -410,18 +420,21 @@ func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.repl = nil
 		m.saveProgress()
+		return m, tea.DisableMouse
 	case "esc":
 		m.replExitToShelf()
+		return m, tea.DisableMouse
 	case "ctrl+c":
 		m.replSyncProgress()
 		m.saveProgress()
-		return m, tea.Quit
+		return m, tea.Quit // quitting restores the terminal (mouse off)
 	case "enter":
 		m.repl.Submit()
 		m.replSyncProgress()
 		m.saveProgress()
 		if m.repl.quit {
 			m.replExitToShelf()
+			return m, tea.DisableMouse
 		}
 	case "backspace":
 		m.repl.Backspace()
@@ -496,17 +509,17 @@ func (m *Model) doImport(path string) {
 	}
 	bk, err := book.Open(path)
 	if err != nil {
-		m.status = "解析失败: " + err.Error()
+		m.status = "error: parse failed: " + err.Error()
 		return
 	}
 	if _, err := m.st.Import(m.lib, path, bk.Title, bk.Author); err != nil {
-		m.status = "导入失败: " + err.Error()
+		m.status = "error: " + err.Error()
 		return
 	}
 	_ = m.st.Save(m.lib)
 	m.shelf = NewShelfView(m.lib)
 	m.screen = screenShelf
-	m.status = "已导入: " + bk.Title
+	m.status = "+ " + bk.Title
 }
 
 func (m *Model) View() string {
@@ -529,13 +542,13 @@ func (m *Model) View() string {
 	case screenHelp:
 		return strings.Join(paintDim(helpText()), "\n")
 	case screenImport:
-		return "导入 EPUB（粘贴 .epub 完整路径后回车，Esc 取消）:\n\n> " + m.importBuf + "\n\n" + m.status
+		return "fetch> " + m.importBuf + "\n(paste a path, Enter to fetch, Esc to cancel)\n\n" + m.status
 	case screenStats:
 		return strings.Join(paintDim((StatsView{}).Render(m.lib, m.width, m.height)), "\n")
 	case screenAnnotList:
 		return strings.Join(paintDim(m.annot.Render(m.width, m.height)), "\n")
 	case screenAnnotate:
-		return "加标注（批注可留空 = 书签，回车保存，Esc 取消）:\n\n> " + m.annotBuf
+		return "break> " + m.annotBuf + "\n(condition optional, Enter to set breakpoint, Esc to cancel)"
 	default:
 		body := m.shelf.Render(m.width, m.height-1)
 		if m.status != "" {
@@ -552,20 +565,28 @@ func (m *Model) readerStyle() string {
 	return m.lib.Global.Style
 }
 
+// idleCap bounds the gap between two reading actions that still counts as
+// reading: dwelling on a page longer than this (or walking away) is not added.
+const idleCap = 2 * time.Minute
+
 // recordActivity accumulates reading time, attributing the gap since the last
-// reading action (capped at 5 minutes so walking away is not counted) and
-// rolling the daily streak.
+// reading action (capped at idleCap) and rolling the daily streak.
 func (m *Model) recordActivity() {
 	now := time.Now()
 	secs := 0
 	if !m.lastActivity.IsZero() {
-		if d := now.Sub(m.lastActivity); d > 0 && d <= 5*time.Minute {
+		if d := now.Sub(m.lastActivity); d > 0 && d <= idleCap {
 			secs = int(d.Seconds())
 		}
 	}
 	store.RecordActivity(m.lib, now, secs)
 	m.lastActivity = now
 }
+
+// pauseTiming stops the reading clock when leaving the reading view for an
+// overlay (TOC/stats/help/annotate), the boss screen, or the shelf, so the time
+// spent away — and the gap until reading resumes — is not counted as reading.
+func (m *Model) pauseTiming() { m.lastActivity = time.Time{} }
 
 // openBookForTest seeds TotalChars from the in-memory book without a real file
 // (used by tests; mirrors the TotalChars seeding that openBook does).

@@ -75,3 +75,47 @@ func TestParseMissingFile(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+// writeEPUBMissingChapters builds an EPUB whose spine references chapter files
+// that are absent from the archive, so every chapter is skipped.
+func writeEPUBMissingChapters(t *testing.T, path string) {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	add := func(name, body string) {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add("META-INF/container.xml", `<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`)
+	add("OEBPS/content.opf", `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>缺章之书</dc:title></metadata>
+<manifest><item id="c1" href="missing.xhtml" media-type="application/xhtml+xml"/></manifest>
+<spine><itemref idref="c1"/></spine>
+</package>`)
+	// note: OEBPS/missing.xhtml is intentionally NOT added
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A book whose every spine entry is unreadable must surface an error rather
+// than import "successfully" as an empty book (silent data loss).
+func TestParseAllChaptersMissing(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "broken.epub")
+	writeEPUBMissingChapters(t, p)
+	if _, err := Parse(p); err == nil {
+		t.Fatal("expected error when no chapters could be parsed, got nil")
+	}
+}

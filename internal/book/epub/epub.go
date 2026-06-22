@@ -54,6 +54,11 @@ func Parse(filename string) (*book.Book, error) {
 		title := paras[0]
 		b.Chapters = append(b.Chapters, book.Chapter{Title: title, Paragraphs: paras})
 	}
+	// The spine listed chapters but none could be read/parsed (e.g. mismatched
+	// hrefs): fail loudly instead of importing a silently-empty book.
+	if len(hrefs) > 0 && len(b.Chapters) == 0 {
+		return nil, errNoChapters
+	}
 	return b, nil
 }
 

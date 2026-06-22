@@ -37,9 +37,33 @@ func padBetween(left, right string, width int) string {
 		return left + strings.Repeat(" ", gap) + right
 	}
 	if rw+1 < width {
-		return fitLine(left, width-rw-1) + " " + right
+		// Keep the SUFFIX of left (the footer puts the reading progress there)
+		// rather than its decorative prefix, while still showing the right marker.
+		return fitLineRight(left, width-rw-1) + " " + right
 	}
 	return fitLine(left, width)
+}
+
+// fitLineRight returns the rightmost `width` display cells of s (CJK-aware),
+// keeping the suffix when s is too wide. width<=0 returns "".
+func fitLineRight(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if render.StringWidth(s) <= width {
+		return s
+	}
+	runes := []rune(s)
+	w := 0
+	// walk from the end, accumulating until we'd exceed width
+	for i := len(runes) - 1; i >= 0; i-- {
+		rw := render.RuneWidth(runes[i])
+		if w+rw > width {
+			return string(runes[i+1:])
+		}
+		w += rw
+	}
+	return s
 }
 
 // separatorLine returns a horizontal rule of width box-drawing dashes.

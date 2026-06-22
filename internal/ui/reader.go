@@ -21,6 +21,15 @@ type ReaderView struct {
 	style   string
 	mode    string
 	nav     string // "page" | "scroll"
+
+	// layout cache: the wrapped lines of cacheChapter at cacheWidth. Re-wrapping
+	// a whole chapter is the dominant per-keystroke cost (Render + nav + status
+	// all need the line list), so memoize it and recompute only when the chapter
+	// or the effective wrap width changes.
+	cacheLines   []string
+	cacheChapter int
+	cacheWidth   int
+	cacheValid   bool
 }
 
 // NewReaderView builds a reader at the given progress/prefs, clamped to valid
@@ -143,10 +152,18 @@ func (r *ReaderView) paras() []string {
 }
 
 func (r *ReaderView) chapterLines() []string {
-	if r.chapter < 0 || r.chapter >= len(r.book.Chapters) {
-		return []string{""}
+	w := r.contentWidth()
+	if r.cacheValid && r.cacheChapter == r.chapter && r.cacheWidth == w {
+		return r.cacheLines
 	}
-	return render.LayoutChapter(r.book.Chapters[r.chapter].Paragraphs, r.contentWidth())
+	var lines []string
+	if r.chapter < 0 || r.chapter >= len(r.book.Chapters) {
+		lines = []string{""}
+	} else {
+		lines = render.LayoutChapter(r.book.Chapters[r.chapter].Paragraphs, w)
+	}
+	r.cacheLines, r.cacheChapter, r.cacheWidth, r.cacheValid = lines, r.chapter, w, true
+	return lines
 }
 
 func (r *ReaderView) chapterLineCount() int { return len(r.chapterLines()) }

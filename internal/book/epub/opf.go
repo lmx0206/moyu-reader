@@ -3,6 +3,7 @@ package epub
 import (
 	"encoding/xml"
 	"errors"
+	"net/url"
 	"path"
 )
 
@@ -10,6 +11,7 @@ var (
 	errNoRootfile   = errors.New("epub: no rootfile in container.xml")
 	errNoSpine      = errors.New("epub: empty spine")
 	errMissingEntry = errors.New("epub: required archive entry missing")
+	errNoChapters   = errors.New("epub: no readable chapters (spine hrefs did not match archive entries)")
 )
 
 // Meta holds book-level metadata extracted from the OPF.
@@ -58,8 +60,14 @@ func parseOPF(data []byte, opfDir string) (Meta, []string, error) {
 }
 
 // joinArchive joins a directory and a relative href into a clean archive path
-// using forward slashes (zip archives always use "/").
+// using forward slashes (zip archives always use "/"). The href is
+// percent-decoded first: OPF hrefs are URL-encoded (spaces as %20, CJK as %XX
+// bytes) while zip entry names are the decoded form, so decoding is required
+// for the later files[href] lookup to match.
 func joinArchive(dir, href string) string {
+	if decoded, err := url.PathUnescape(href); err == nil {
+		href = decoded
+	}
 	if dir == "" || dir == "." {
 		return path.Clean(href)
 	}

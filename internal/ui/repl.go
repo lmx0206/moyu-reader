@@ -97,9 +97,6 @@ func (rv *ReplView) Progress() store.Progress {
 	return store.Progress{Chapter: rv.chapter, Para: p}
 }
 
-// Prefs returns the current style with mode "repl".
-func (rv *ReplView) Prefs() store.Prefs { return store.Prefs{Style: rv.style, Mode: "repl"} }
-
 func (rv *ReplView) Insert(s string) { rv.input += s }
 func (rv *ReplView) Backspace() {
 	if n := len(rv.input); n > 0 {
