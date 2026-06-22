@@ -41,7 +41,13 @@ func TestRenderShellFiveSectionLayout(t *testing.T) {
 	if !strings.Contains(out[4], "─") {
 		t.Fatalf("line4 should be separator: %q", out[4])
 	}
-	if !strings.Contains(out[5], "SUCCESSFUL") {
-		t.Fatalf("bottom bar should be build theme: %q", out[5])
+	// At this tight width (40) the footer can't fit both the decorative
+	// "BUILD SUCCESSFUL" prefix and the reading progress; progress wins (I5),
+	// and the right help marker is still kept.
+	if !strings.Contains(out[5], "0%") {
+		t.Fatalf("bottom bar should keep reading progress at narrow width: %q", out[5])
+	}
+	if !strings.Contains(out[5], "? help") {
+		t.Fatalf("bottom bar should keep the help marker: %q", out[5])
 	}
 }
