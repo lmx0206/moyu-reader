@@ -192,6 +192,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key == "?" {
 		m.helpReturn = m.screen
 		m.screen = screenHelp
+		m.pauseTiming()
 		return m, nil
 	}
 
@@ -199,6 +200,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if (key == "`" || key == "b") && m.screen == screenReader {
 		m.bossActive = true
 		m.bossTick = 0
+		m.pauseTiming()
 		return m, bossTick()
 	}
 
@@ -339,8 +341,10 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 	case "c":
 		m.statsReturn = screenReader
 		m.screen = screenStats
+		m.pauseTiming()
 	case "q", "esc":
 		m.saveProgress()
+		m.pauseTiming()
 		m.screen = screenShelf
 		m.shelf = NewShelfView(m.lib)
 	case "ctrl+c":
@@ -365,15 +369,18 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 	case "a":
 		m.annotBuf = ""
 		m.screen = screenAnnotate
+		m.pauseTiming()
 	case "l":
 		if e := m.lib.FindByID(m.bookID); e != nil && m.book != nil {
 			m.annot = NewAnnotationView(m.book, e.Annotations)
 			m.screen = screenAnnotList
+			m.pauseTiming()
 		}
 	case "g":
 		if m.book != nil {
 			m.toc = NewTOCView(m.book, m.reader.Progress().Chapter)
 			m.screen = screenTOC
+			m.pauseTiming()
 		}
 	}
 	return m, nil
@@ -402,6 +409,7 @@ func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "`":
 		m.bossActive = true
 		m.bossTick = 0
+		m.pauseTiming()
 		return m, bossTick()
 	case "m":
 		// leave repl, resume shell-mode reading at the same paragraph
@@ -557,20 +565,28 @@ func (m *Model) readerStyle() string {
 	return m.lib.Global.Style
 }
 
+// idleCap bounds the gap between two reading actions that still counts as
+// reading: dwelling on a page longer than this (or walking away) is not added.
+const idleCap = 2 * time.Minute
+
 // recordActivity accumulates reading time, attributing the gap since the last
-// reading action (capped at 5 minutes so walking away is not counted) and
-// rolling the daily streak.
+// reading action (capped at idleCap) and rolling the daily streak.
 func (m *Model) recordActivity() {
 	now := time.Now()
 	secs := 0
 	if !m.lastActivity.IsZero() {
-		if d := now.Sub(m.lastActivity); d > 0 && d <= 5*time.Minute {
+		if d := now.Sub(m.lastActivity); d > 0 && d <= idleCap {
 			secs = int(d.Seconds())
 		}
 	}
 	store.RecordActivity(m.lib, now, secs)
 	m.lastActivity = now
 }
+
+// pauseTiming stops the reading clock when leaving the reading view for an
+// overlay (TOC/stats/help/annotate), the boss screen, or the shelf, so the time
+// spent away — and the gap until reading resumes — is not counted as reading.
+func (m *Model) pauseTiming() { m.lastActivity = time.Time{} }
 
 // openBookForTest seeds TotalChars from the in-memory book without a real file
 // (used by tests; mirrors the TotalChars seeding that openBook does).

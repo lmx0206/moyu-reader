@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"moyureader/internal/store"
@@ -307,6 +308,35 @@ func TestModelReplMouseWheelScrolls(t *testing.T) {
 	m = nm.(*Model)
 	if m.repl.scrollOff != 0 {
 		t.Fatalf("wheel down should scroll back to bottom, got %d", m.repl.scrollOff)
+	}
+}
+
+// Leaving the reader for an overlay must pause the reading clock, so the time
+// spent browsing the overlay (and the gap until you return) is not counted as
+// reading time.
+func TestModelOpeningTOCPausesTiming(t *testing.T) {
+	m := newReaderModel(t)
+	m.lastActivity = time.Now() // pretend we were actively reading
+	nm, _ := m.Update(keyRunes("g"))
+	m = nm.(*Model)
+	if m.screen != screenTOC {
+		t.Fatalf("g should open TOC, got %v", m.screen)
+	}
+	if !m.lastActivity.IsZero() {
+		t.Fatal("opening TOC should pause the reading clock (lastActivity zeroed)")
+	}
+}
+
+func TestModelBossPausesTiming(t *testing.T) {
+	m := newReaderModel(t)
+	m.lastActivity = time.Now()
+	nm, _ := m.Update(keyRunes("`"))
+	m = nm.(*Model)
+	if !m.bossActive {
+		t.Fatal("backtick should activate boss")
+	}
+	if !m.lastActivity.IsZero() {
+		t.Fatal("activating boss should pause the reading clock")
 	}
 }
 
