@@ -1,12 +1,23 @@
 package ui
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"moyureader/internal/store"
 )
+
+// cmdMsgType runs a command and returns the concrete type of the message it
+// produces, for comparing against known bubbletea commands (whose message
+// types are unexported and so cannot be named directly).
+func cmdMsgType(cmd tea.Cmd) reflect.Type {
+	if cmd == nil {
+		return nil
+	}
+	return reflect.TypeOf(cmd())
+}
 
 func keyRunes(s string) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
@@ -296,5 +307,45 @@ func TestModelReplMouseWheelScrolls(t *testing.T) {
 	m = nm.(*Model)
 	if m.repl.scrollOff != 0 {
 		t.Fatalf("wheel down should scroll back to bottom, got %d", m.repl.scrollOff)
+	}
+}
+
+func TestModelEnteringReplEnablesMouse(t *testing.T) {
+	m := newReaderModel(t)            // shell
+	nm, _ := m.Update(keyRunes("m"))  // shell -> inline
+	m = nm.(*Model)
+	nm, cmd := m.Update(keyRunes("m")) // inline -> repl
+	m = nm.(*Model)
+	if m.repl == nil {
+		t.Fatal("second m should enter repl")
+	}
+	if cmdMsgType(cmd) != reflect.TypeOf(tea.EnableMouseCellMotion()) {
+		t.Fatalf("entering repl should return EnableMouseCellMotion cmd, got %v", cmdMsgType(cmd))
+	}
+}
+
+func TestModelLeavingReplDisablesMouse(t *testing.T) {
+	m := newReaderModel(t)
+	m.repl = NewReplView(m.book, store.Progress{}, store.Prefs{Style: "log"}, 40, 12)
+	nm, cmd := m.Update(keyRunes("m")) // m in repl -> back to shell
+	m = nm.(*Model)
+	if m.repl != nil {
+		t.Fatal("m in repl should leave repl")
+	}
+	if cmdMsgType(cmd) != reflect.TypeOf(tea.DisableMouse()) {
+		t.Fatalf("leaving repl should return DisableMouse cmd, got %v", cmdMsgType(cmd))
+	}
+}
+
+func TestModelReplEscDisablesMouse(t *testing.T) {
+	m := newReaderModel(t)
+	m.repl = NewReplView(m.book, store.Progress{}, store.Prefs{Style: "log"}, 40, 12)
+	nm, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = nm.(*Model)
+	if m.screen != screenShelf || m.repl != nil {
+		t.Fatalf("esc in repl should return to shelf, screen=%v repl=%v", m.screen, m.repl)
+	}
+	if cmdMsgType(cmd) != reflect.TypeOf(tea.DisableMouse()) {
+		t.Fatalf("esc out of repl should disable the mouse, got %v", cmdMsgType(cmd))
 	}
 }

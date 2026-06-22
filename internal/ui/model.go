@@ -359,7 +359,7 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.reader.CycleStyle()
 	case "m":
-		m.cycleMode()
+		return m, m.cycleMode()
 	case "s":
 		m.reader.ToggleNav()
 	case "a":
@@ -381,17 +381,19 @@ func (m *Model) handleReaderKey(key string) (tea.Model, tea.Cmd) {
 
 // cycleMode advances the reading presentation shell -> inline -> repl. (The
 // repl -> shell leg is handled inside handleReplKey, since the 'm' key is
-// intercepted there while the REPL is active.)
-func (m *Model) cycleMode() {
+// intercepted there while the REPL is active.) Entering the REPL returns a
+// command enabling the mouse so the wheel can scroll the scrollback.
+func (m *Model) cycleMode() tea.Cmd {
 	if m.book == nil {
 		m.reader.ToggleMode()
-		return
+		return nil
 	}
 	if m.reader.Prefs().Mode == "inline" {
 		m.repl = NewReplView(m.book, m.reader.Progress(), m.reader.Prefs(), m.width, m.height)
-		return
+		return tea.EnableMouseCellMotion
 	}
 	m.reader.ToggleMode() // shell -> inline
+	return nil
 }
 
 func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -410,18 +412,21 @@ func (m *Model) handleReplKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.repl = nil
 		m.saveProgress()
+		return m, tea.DisableMouse
 	case "esc":
 		m.replExitToShelf()
+		return m, tea.DisableMouse
 	case "ctrl+c":
 		m.replSyncProgress()
 		m.saveProgress()
-		return m, tea.Quit
+		return m, tea.Quit // quitting restores the terminal (mouse off)
 	case "enter":
 		m.repl.Submit()
 		m.replSyncProgress()
 		m.saveProgress()
 		if m.repl.quit {
 			m.replExitToShelf()
+			return m, tea.DisableMouse
 		}
 	case "backspace":
 		m.repl.Backspace()
