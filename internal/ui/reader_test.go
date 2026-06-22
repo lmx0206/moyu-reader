@@ -161,6 +161,39 @@ func longParaBook() *book.Book {
 	}
 }
 
+// The per-chapter layout is memoized; the cache must invalidate when the wrap
+// width changes (SetSize) or the chapter changes (JumpTo), or the reader would
+// render a stale layout.
+func TestReaderLayoutCacheInvalidates(t *testing.T) {
+	b := longParaBook()
+	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
+	narrow := len(r.chapterLines())
+	r.SetSize(120, 12) // wider -> fewer wrapped lines
+	wide := len(r.chapterLines())
+	if wide >= narrow {
+		t.Fatalf("cache should reflect wider width: narrow=%d wide=%d", narrow, wide)
+	}
+	// repeated calls at the same width reuse the cached slice (same backing array)
+	first := r.chapterLines()
+	again := r.chapterLines()
+	if len(first) > 0 && &first[0] != &again[0] {
+		t.Fatal("repeated chapterLines at same width should reuse the cached slice")
+	}
+
+	twoChapters := sampleBook() // 2 chapters
+	r2 := NewReaderView(twoChapters, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
+	c0 := len(r2.chapterLines())
+	r2.JumpTo(1)
+	c1 := len(r2.chapterLines())
+	if c0 == 0 || c1 == 0 {
+		t.Fatalf("chapter line counts should be non-zero: c0=%d c1=%d", c0, c1)
+	}
+	// chapter 1 has fewer paragraphs than chapter 0 in sampleBook (5 vs 20)
+	if c1 >= c0 {
+		t.Fatalf("cache should reflect chapter change: ch0=%d ch1=%d", c0, c1)
+	}
+}
+
 func TestReaderResizePreservesParagraph(t *testing.T) {
 	b := longParaBook()
 	r := NewReaderView(b, store.Progress{}, store.Prefs{Style: "log", Mode: "shell"}, 40, 12)
