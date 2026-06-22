@@ -31,9 +31,13 @@ func TestParseArgs(t *testing.T) {
 }
 
 func TestResolveDataDirEnvOverride(t *testing.T) {
-	got := resolveDataDir("D:\\develop\\reader.exe", "D:\\mydata")
-	if got != "D:\\mydata" {
-		t.Fatalf("env override should win, got %q", got)
+	// An already-absolute override is returned as-is. Use an OS-absolute path
+	// (t.TempDir) so the test is portable: filepath.Abs is a no-op on it, on
+	// both Windows and the Linux CI runner.
+	abs := t.TempDir()
+	got := resolveDataDir(filepath.Join("D:\\develop", "reader.exe"), abs)
+	if got != abs {
+		t.Fatalf("absolute env override should win as-is, got %q want %q", got, abs)
 	}
 }
 
@@ -42,5 +46,15 @@ func TestResolveDataDirExeAdjacent(t *testing.T) {
 	want := filepath.Join("D:\\app", "data")
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+// A relative MOYU_DATA must be absolutized so the same value resolves to the
+// same library regardless of the process's working directory (double-click vs
+// shell launch).
+func TestResolveDataDirEnvAbsolutized(t *testing.T) {
+	got := resolveDataDir("D:\\app\\reader.exe", "rel/data")
+	if !filepath.IsAbs(got) {
+		t.Fatalf("relative env override should be absolutized, got %q", got)
 	}
 }

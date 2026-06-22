@@ -1,12 +1,15 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	_ "moyureader/internal/book/formats" // register .epub/.txt parsers for import tests
 	"moyureader/internal/store"
 )
 
@@ -337,6 +340,44 @@ func TestModelBossPausesTiming(t *testing.T) {
 	}
 	if !m.lastActivity.IsZero() {
 		t.Fatal("activating boss should pause the reading clock")
+	}
+}
+
+// Importing a book must seed TotalChars immediately, so the coverage/stats
+// panel shows a real total even for books that have never been opened.
+func TestModelImportSeedsTotalChars(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "book.txt")
+	if err := os.WriteFile(src, []byte("第一行内容\n第二行也有字\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st := store.New(filepath.Join(dir, "data"))
+	m := &Model{st: st, lib: store.NewLibrary(), width: 80, height: 24}
+	m.doImport(src)
+	if len(m.lib.Books) != 1 {
+		t.Fatalf("import should add one book, got %d", len(m.lib.Books))
+	}
+	if got := m.lib.Books[0].TotalChars; got <= 0 {
+		t.Fatalf("import should seed TotalChars > 0, got %d", got)
+	}
+}
+
+func TestModelDeleteSelectedRemovesOnlyThatBook(t *testing.T) {
+	st := store.New(t.TempDir())
+	lib := store.NewLibrary()
+	lib.Books = []store.BookEntry{{ID: "a", Title: "A"}, {ID: "b", Title: "B"}, {ID: "c", Title: "C"}}
+	var m tea.Model = NewModel(st, lib, "") // starts on shelf
+	sel := m.(*Model).shelf.Selected().ID
+	nm, _ := m.Update(keyRunes("d"))
+	m = nm.(*Model)
+	books := m.(*Model).lib.Books
+	if len(books) != 2 {
+		t.Fatalf("want 2 books left after delete, got %d", len(books))
+	}
+	for _, b := range books {
+		if b.ID == sel {
+			t.Fatalf("deleted book %q is still present", sel)
+		}
 	}
 }
 

@@ -51,7 +51,13 @@ func (pytestTheme) Name() string { return "pytest" }
 var pytestMods = []string{"core", "api", "auth", "models", "utils", "cache"}
 
 func (pytestTheme) LinePrefix(seed int) string {
-	return fmt.Sprintf("tests/test_%s.py::test_%d ", pytestMods[seed%len(pytestMods)], seed%97)
+	// Scatter the test number with a multiplicative hash so it doesn't ramp
+	// 0,1,2,… with the line index (a clean ramp reads as fake output).
+	n := (seed*2654435761 + 1013904223) % 1000
+	if n < 0 {
+		n += 1000
+	}
+	return fmt.Sprintf("tests/test_%s.py::test_%d ", pytestMods[seed%len(pytestMods)], n)
 }
 func (pytestTheme) Header(width int, status string) string {
 	return padBetween("pytest -v", "● running", width)

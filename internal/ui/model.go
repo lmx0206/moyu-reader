@@ -324,7 +324,7 @@ func (m *Model) deleteSelected() {
 		return
 	}
 	id := sel.ID
-	books := m.lib.Books[:0]
+	books := make([]store.BookEntry, 0, len(m.lib.Books))
 	for _, b := range m.lib.Books {
 		if b.ID != id {
 			books = append(books, b)
@@ -512,10 +512,12 @@ func (m *Model) doImport(path string) {
 		m.status = "error: parse failed: " + err.Error()
 		return
 	}
-	if _, err := m.st.Import(m.lib, path, bk.Title, bk.Author); err != nil {
+	entry, err := m.st.Import(m.lib, path, bk.Title, bk.Author)
+	if err != nil {
 		m.status = "error: " + err.Error()
 		return
 	}
+	entry.TotalChars = book.TotalChars(bk) // seed now so unopened books show real coverage
 	_ = m.st.Save(m.lib)
 	m.shelf = NewShelfView(m.lib)
 	m.screen = screenShelf
