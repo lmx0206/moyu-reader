@@ -84,14 +84,14 @@ func (m *Model) Init() tea.Cmd { return nil }
 func (m *Model) openBook(id string) {
 	e := m.lib.FindByID(id)
 	if e == nil {
-		m.status = "找不到这本书"
+		m.status = "fatal: pathspec did not match any object"
 		return
 	}
 	bk, err := book.Open(filepath.Join(m.st.Dir(), filepath.FromSlash(e.File)))
 	if err != nil {
 		e.Broken = true
 		_ = m.st.Save(m.lib)
-		m.status = "这本书打不开（已标记损坏）"
+		m.status = "error: object file could not be read (marked stale)"
 		return
 	}
 	if e.TotalChars == 0 {
@@ -243,7 +243,7 @@ func (m *Model) handleAnnotateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		})
 		_ = m.st.Save(m.lib)
 		m.screen = screenReader
-		m.status = "已加标注"
+		m.status = "breakpoint set"
 	case "backspace":
 		if n := len(m.annotBuf); n > 0 {
 			m.annotBuf = m.annotBuf[:n-1]
@@ -509,17 +509,17 @@ func (m *Model) doImport(path string) {
 	}
 	bk, err := book.Open(path)
 	if err != nil {
-		m.status = "解析失败: " + err.Error()
+		m.status = "error: parse failed: " + err.Error()
 		return
 	}
 	if _, err := m.st.Import(m.lib, path, bk.Title, bk.Author); err != nil {
-		m.status = "导入失败: " + err.Error()
+		m.status = "error: " + err.Error()
 		return
 	}
 	_ = m.st.Save(m.lib)
 	m.shelf = NewShelfView(m.lib)
 	m.screen = screenShelf
-	m.status = "已导入: " + bk.Title
+	m.status = "+ " + bk.Title
 }
 
 func (m *Model) View() string {
@@ -542,13 +542,13 @@ func (m *Model) View() string {
 	case screenHelp:
 		return strings.Join(paintDim(helpText()), "\n")
 	case screenImport:
-		return "导入 EPUB（粘贴 .epub 完整路径后回车，Esc 取消）:\n\n> " + m.importBuf + "\n\n" + m.status
+		return "fetch> " + m.importBuf + "\n(paste a path, Enter to fetch, Esc to cancel)\n\n" + m.status
 	case screenStats:
 		return strings.Join(paintDim((StatsView{}).Render(m.lib, m.width, m.height)), "\n")
 	case screenAnnotList:
 		return strings.Join(paintDim(m.annot.Render(m.width, m.height)), "\n")
 	case screenAnnotate:
-		return "加标注（批注可留空 = 书签，回车保存，Esc 取消）:\n\n> " + m.annotBuf
+		return "break> " + m.annotBuf + "\n(condition optional, Enter to set breakpoint, Esc to cancel)"
 	default:
 		body := m.shelf.Render(m.width, m.height-1)
 		if m.status != "" {

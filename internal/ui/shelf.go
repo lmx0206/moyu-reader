@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"hash/fnv"
 	"sort"
 
 	"moyureader/internal/store"
@@ -51,28 +52,36 @@ func (s *ShelfView) Selected() *store.BookEntry {
 	return &s.items[s.cursor]
 }
 
-// Render returns up to height lines listing the books.
+// shortHash returns a deterministic 7-hex-digit id for a book, so the shelf can
+// present each book as a fake git commit.
+func shortHash(id string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(id))
+	return fmt.Sprintf("%07x", h.Sum32()&0xfffffff)
+}
+
+// Render lists the books disguised as `git log --oneline` output: each book is a
+// commit (hash + subject), the selected one carries the (HEAD) marker, and a
+// broken book is annotated (stale). It never reads as a bookshelf.
 func (s *ShelfView) Render(width, height int) []string {
+	out := []string{"$ git log --oneline"}
 	if len(s.items) == 0 {
-		return []string{
-			"书架空空如也。",
-			"按 i 导入一本 .epub，或用命令行: reader <某本书.epub>",
-		}
+		return append(out, "fatal: your current branch 'main' does not have any commits yet")
 	}
-	var out []string
-	out = append(out, "📚 书架   ↑↓ 选择 · Enter 阅读 · i 导入 · d 删除 · q 退出")
-	out = append(out, "")
 	for i, e := range s.items {
-		cursor := "  "
+		subject := e.Title
+		if subject == "" {
+			subject = e.ID
+		}
+		marker := ""
 		if i == s.cursor {
-			cursor = "> "
+			marker = " (HEAD)"
 		}
-		broken := ""
+		stale := ""
 		if e.Broken {
-			broken = " [损坏]"
+			stale = " (stale)"
 		}
-		line := fmt.Sprintf("%s%s — %s%s", cursor, e.Title, e.Author, broken)
-		out = append(out, line)
+		out = append(out, fmt.Sprintf("%s%s %s%s", shortHash(e.ID), marker, subject, stale))
 		if len(out) >= height {
 			break
 		}

@@ -340,6 +340,34 @@ func TestModelBossPausesTiming(t *testing.T) {
 	}
 }
 
+func TestModelImportViewDisguised(t *testing.T) {
+	m := newReaderModel(t)
+	m.screen = screenImport
+	m.importBuf = "/tmp/x.epub"
+	out := m.View()
+	for _, leak := range []string{"导入 EPUB", "粘贴", "书架"} {
+		if strings.Contains(out, leak) {
+			t.Fatalf("import view leaked reader chrome %q:\n%s", leak, out)
+		}
+	}
+	if !strings.Contains(out, m.importBuf) {
+		t.Fatalf("import view should echo the typed path:\n%s", out)
+	}
+}
+
+func TestModelAnnotateViewDisguised(t *testing.T) {
+	m := newReaderModel(t)
+	m.screen = screenAnnotate
+	m.annotBuf = "note here"
+	out := m.View()
+	if strings.Contains(out, "加标注") || strings.Contains(out, "书签") {
+		t.Fatalf("annotate view leaked reader chrome:\n%s", out)
+	}
+	if !strings.Contains(out, m.annotBuf) {
+		t.Fatalf("annotate view should echo the typed note:\n%s", out)
+	}
+}
+
 func TestModelEnteringReplEnablesMouse(t *testing.T) {
 	m := newReaderModel(t)            // shell
 	nm, _ := m.Update(keyRunes("m"))  // shell -> inline

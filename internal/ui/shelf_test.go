@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	"moyureader/internal/store"
@@ -43,5 +44,35 @@ func TestShelfSelectedEmpty(t *testing.T) {
 	r := s.Render(40, 10)
 	if len(r) == 0 {
 		t.Fatal("empty shelf should still render a hint")
+	}
+}
+
+// The shelf must read as developer-tool output (a git-log-style listing), never
+// as a bookshelf: no "书架"/📚 chrome or plaintext reader UI.
+func TestShelfDisguisedAsGitLog(t *testing.T) {
+	lib := &store.Library{Books: []store.BookEntry{
+		{ID: "a", Title: "三体", Author: "刘慈欣"},
+		{ID: "b", Title: "活着", Author: "余华", Broken: true},
+	}}
+	joined := strings.Join(NewShelfView(lib).Render(80, 20), "\n")
+	for _, leak := range []string{"书架", "📚", "选择", "阅读", "导入", "删除"} {
+		if strings.Contains(joined, leak) {
+			t.Fatalf("shelf leaked reader chrome %q:\n%s", leak, joined)
+		}
+	}
+	if !strings.Contains(joined, "git log") {
+		t.Fatalf("shelf should be framed as git log output:\n%s", joined)
+	}
+	if !strings.Contains(joined, "三体") || !strings.Contains(joined, "活着") {
+		t.Fatalf("shelf should still list the books so the user can pick:\n%s", joined)
+	}
+}
+
+func TestShelfEmptyDisguised(t *testing.T) {
+	joined := strings.Join(NewShelfView(&store.Library{}).Render(80, 10), "\n")
+	for _, leak := range []string{"书架", "📚", "导入"} {
+		if strings.Contains(joined, leak) {
+			t.Fatalf("empty shelf leaked reader chrome %q:\n%s", leak, joined)
+		}
 	}
 }
