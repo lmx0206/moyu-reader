@@ -14,10 +14,15 @@ go test ./internal/ui/ -run TestReaderJumpTo    # single test (pkg + -run regex)
 go vet ./...                                     # static check (CI gate)
 go build ./...                                   # compile everything
 
-# build the exe (version shows as "dev")
+# one-click build with the version auto-derived from git (no manual version):
+./scripts/build.ps1   # PowerShell (primary)
+./scripts/build.sh    # Git Bash / WSL
+# both produce moyu-reader_v<git-describe>.exe with version baked in via ldflags
+
+# plain build (version shows as "dev")
 go build -ldflags "-s -w" -o reader.exe ./cmd/reader
-# build with an injected version (matches release artifacts)
-go build -ldflags "-s -w -X moyureader/internal/version.Version=0.5.1" -o moyu-reader_v0.5.1.exe ./cmd/reader
+# manual injected version (what the scripts automate)
+go build -ldflags "-s -w -X moyureader/internal/version.Version=0.6.2" -o moyu-reader_v0.6.2.exe ./cmd/reader
 ```
 
 CI (`.github/workflows/ci.yml`) runs vet + test + build on every push/PR. `release.yml` triggers on a `v*` tag: it injects the tag (minus the leading `v`) into `version.Version` via ldflags and publishes `moyu-reader_v<tag>.exe` to Releases.

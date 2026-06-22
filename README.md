@@ -27,15 +27,18 @@
 到 [Releases](https://github.com/lmx0206/moyu-reader/releases) 下载最新的 `moyu-reader_vX.X.X.exe`，双击即用。
 
 ### 方式二：自行编译
-需要 Go 1.26+：
+需要 Go 1.26+。**一键编译（推荐）**——版本号自动取自 git tag，无需手动填：
 ```
-# 普通编译（版本号显示为 dev）
-go build -ldflags "-s -w" -o reader.exe ./cmd/reader
+./scripts/build.ps1     # PowerShell
+./scripts/build.sh      # Git Bash / WSL
+```
+产物为 `moyu-reader_v<版本>.exe`（如 `moyu-reader_v0.6.2.exe`），版本号已嵌入二进制，`moyu-reader_v0.6.2.exe version` 可查看。版本由 `git describe --tags` 推导：正好在某个 tag 上 → `0.6.2`；tag 之后若干提交 → `0.6.2-3-g<hash>`；有未提交改动 → 末尾带 `-dirty`。
 
-# 带版本号编译（与发布产物一致）
-go build -ldflags "-s -w -X moyureader/internal/version.Version=0.5.1" -o moyu-reader_v0.5.1.exe ./cmd/reader
+手动编译（如需）：
 ```
-产物是单文件 exe。数据（书架 + 进度 + 标注 + 导入的书）存在 exe 同级的 `data/` 文件夹，可用环境变量 `MOYU_DATA` 改到别处。版本号会嵌入二进制，`reader.exe version` 可查看。
+go build -ldflags "-s -w" -o reader.exe ./cmd/reader   # 版本显示为 dev
+```
+数据（书架 + 进度 + 标注 + 导入的书）存在 exe 同级的 `data/` 文件夹，可用环境变量 `MOYU_DATA` 改到别处。
 
 > 小贴士：可把 exe 改名成 `tail.exe` / `gradlew.exe`，进程列表里更不显眼。
 

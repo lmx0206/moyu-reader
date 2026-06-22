@@ -1,0 +1,6 @@
+# Shell scripts must stay LF or the shebang breaks when run on Unix/Git Bash.
+*.sh text eol=lf
+# PowerShell scripts are fine as CRLF on Windows.
+*.ps1 text eol=crlf
+# Go sources: normalize to LF.
+*.go text eol=lf
